@@ -21,15 +21,15 @@ import styles from "./WaterCooledACAnimation.module.css";
 /** Parts of the illustration that are lit (and animated) or dimmed per step. */
 export type Part =
   | "air" //          room air in and out of the wall unit
-  | "unit" //         wall unit body
-  | "coil" //         refrigerant coil inside the wall unit
-  | "suction" //      refrigerant gas pipe (larger): wall unit → compressor
+  | "unit" //         wall unit outline
+  | "coil" //         refrigerant loop inside the wall unit
+  | "suction" //      refrigerant gas line: wall unit → compressor
   | "compressor"
-  | "discharge" //    hot gas: compressor → heat exchanger
+  | "discharge" //    hot refrigerant: compressor → heat exchanger
   | "hx" //           plate heat exchanger
-  | "warmLiquid" //   warm liquid: heat exchanger → expansion valve
+  | "warmLiquid" //   refrigerant: heat exchanger → expansion valve
   | "valve" //        expansion valve
-  | "liquid" //       cold liquid pipe (smaller): expansion valve → wall unit
+  | "liquid" //       refrigerant liquid line: expansion valve → wall unit
   | "water"; //       building water loop, taps, isolation valves, roof note
 
 /** Things that can wear the pulsing highlight ring (one per step). */
@@ -59,22 +59,17 @@ export interface Labels {
   wallUnit: string;
   condenserUnit: string;
   waterZone: string;
-  waterIn: string;
-  waterOut: string;
   callouts: Record<Callout, string>;
   condensateDrain: readonly string[]; // one entry per line
   toRoof: readonly string[]; //         one entry per line
   badge: readonly [string, string]; //  [bold line, second line]
-  legendCold: string;
+  legendHeat: string;
   legendCool: string;
-  legendHot: string;
   legendWater: string;
-  /** Hover tooltips on parts that are not labelled on the drawing. */
+  /** Hover tooltips on small parts that are not labelled on the drawing. */
   tooltips: {
     expansionValve: string;
     isolationValve: string;
-    gasPipe: string;
-    liquidPipe: string;
   };
   /* Accessible copy */
   svgTitle: string;
@@ -135,28 +130,24 @@ export const LABELS: Labels = {
   wallUnit: "Wall unit",
   condenserUnit: "Condenser unit",
   waterZone: "Water zone",
-  waterIn: "Cooler in",
-  waterOut: "Warmer out",
   callouts: { compressor: "Compressor", heatExchanger: "Heat exchanger" },
   condensateDrain: ["Condensate", "drain"],
   toRoof: ["To rooftop", "coolers"],
   badge: ["Refrigerant only", "no water piped in"],
-  legendCold: "Cold refrigerant",
-  legendCool: "Heat-carrying gas",
-  legendHot: "Hot refrigerant",
-  legendWater: "Building water loop",
+  legendHeat: "Heat",
+  legendCool: "Cool",
+  legendWater: "Building water",
   tooltips: {
     expansionValve: "Expansion valve",
     isolationValve: "Isolation valve",
-    gasPipe: "Refrigerant gas (larger pipe)",
-    liquidPipe: "Refrigerant liquid (smaller pipe)",
   },
   svgTitle: "How water-cooled air conditioning works",
   svgDesc:
     "A water-cooled air conditioning system in an apartment, shown in five steps. A wall unit absorbs heat from the room " +
     "into refrigerant, which travels through slim insulated pipes to a condenser unit in a cupboard, where a compressor " +
     "and heat exchanger pass the heat to water from the building's shared water loop. Water stays in the condenser unit " +
-    "and the building loop; only refrigerant travels to the wall unit.",
+    "and the building loop; only refrigerant travels to the wall unit. Red lines show heat, light blue lines show cool " +
+    "refrigerant and air, and thicker mid-blue lines show the building's water.",
   controlsGroup: "Animation controls",
   play: "Play animation",
   pause: "Pause animation",
@@ -167,71 +158,62 @@ export const LABELS: Labels = {
 };
 
 /* ========================================================================== */
-/*  Geometry (viewBox 0 0 800 548)                                             */
-/*  Refrigerant cycle: coil → gas pipe → compressor → heat exchanger →         */
-/*  expansion valve → liquid pipe → coil. Paths are drawn in flow direction.   */
+/*  Geometry (viewBox 0 0 800 516)                                             */
+/*  Refrigerant cycle: wall-unit coil → gas line → compressor → heat           */
+/*  exchanger → expansion valve → liquid line → coil. Paths run with the flow. */
 /* ========================================================================== */
 
 const VB_W = 800;
-const VB_H = 548;
+const VB_H = 516;
 
 const PATHS = {
-  /** Wall-unit coil: cold liquid enters along the bottom… */
-  coilIn: "M 284 146 H 122",
-  /** …turns, and leaves as cool, heat-carrying gas along the top. */
-  coilOut: "M 122 146 A 10 10 0 0 1 122 126 H 284",
-  /** Gas (suction) pipe, the larger one: wall unit → through wall → compressor. */
+  /** Inside the wall unit: in along the bottom, round the bend, out along the top. */
+  coil: "M 284 146 H 124 A 10 10 0 0 1 124 126 H 284",
+  /** Gas line: wall unit → through the wall → compressor. Cool, carrying the room's heat. */
   suction: "M 284 126 H 404 V 272",
-  /** Hot gas: compressor → top of the heat exchanger. */
-  discharge: "M 456 296 H 486 V 276 H 520",
-  /** Warm liquid: bottom of the heat exchanger → expansion valve. */
-  warmLiquid: "M 532 372 V 406 H 470",
-  /** Cold liquid pipe, the smaller one: expansion valve → through wall → wall unit. */
-  liquid: "M 470 406 H 358 V 146 H 284",
+  /** Hot refrigerant: compressor → top of the heat exchanger. */
+  discharge: "M 456 296 H 486 V 280 H 520",
+  /** Out of the bottom of the heat exchanger → expansion valve. */
+  warmLiquid: "M 532 372 V 406 H 478",
+  /** Liquid line: expansion valve → through the wall → wall unit. */
+  liquid: "M 462 406 H 358 V 146 H 284",
   /** Building loop: flow comes down from the roof, return goes back up. */
-  flowRiser: "M 752 -2 V 482",
-  returnRiser: "M 708 482 V -2",
-  /** Counterflow: water enters the heat exchanger at the bottom, leaves at the top. */
-  flowTap: "M 752 350 H 604",
-  returnTap: "M 604 276 H 708",
-  /** Condensate drain: thin and grey, outside the water zone, runs to waste. */
-  drain: "M 112 170 V 466",
+  flowRiser: "M 752 -4 V 470",
+  returnRiser: "M 708 470 V -4",
+  /** Counterflow: water enters the heat exchanger at the bottom, leaves at the top.
+      The flow tap hops over the return riser. */
+  flowTap: "M 752 350 H 721 A 13 13 0 0 0 695 350 H 604",
+  flowHop: "M 721 350 A 13 13 0 0 0 695 350",
+  returnTap: "M 604 280 H 708",
+  /** Condensate drain: thin light grey, outside the water zone, runs to waste. */
+  drain: "M 112 170 V 462",
   /** Badge leader: from the badge to the pipe pair where it crosses the wall. */
   leader: "M 256 258 L 298 164 V 108",
   /** Where water exists. It ends inside the condenser unit, at x = 500. */
-  zone: "M 500 188 H 682 V 6 H 798 V 480 H 682 V 428 H 500 Z",
+  zone: "M 500 188 H 682 V 6 H 796 V 476 H 682 V 428 H 500 Z",
 } as const;
 
-const CASING = { x: 380, y: 208, w: 248, h: 212, r: 18 } as const;
+const CASING = { x: 380, y: 208, w: 248, h: 212, r: 16 } as const;
 
-/** Two-turn scroll (Archimedean spiral): the compressor's working part. */
+/** Two-turn scroll (Archimedean spiral): the compressor's working part, drawn as a line. */
 const SCROLL_PATH = (() => {
   const cx = 426;
-  const cy = 300;
+  const cy = 318;
   const turns = 2.25;
   const pts: string[] = [];
   for (let i = 0; i <= 72; i++) {
     const t = (i / 72) * turns * 2 * Math.PI;
-    const r = 3 + (17 * t) / (turns * 2 * Math.PI);
+    const r = 3 + (16 * t) / (turns * 2 * Math.PI);
     pts.push(`${(cx + r * Math.cos(t)).toFixed(1)} ${(cy + r * Math.sin(t)).toFixed(1)}`);
   }
   return `M ${pts.join(" L ")}`;
 })();
 
-/** Numbered markers tie step n's button to a place on the drawing. */
-const MARKERS = [
-  { n: 1, x: 66, y: 120 }, //  wall unit
-  { n: 2, x: 318, y: 192 }, // wall crossing
-  { n: 3, x: 426, y: 348 }, // compressor
-  { n: 4, x: 562, y: 318 }, // heat exchanger (between the heat squiggles)
-] as const;
-
 type Dir = "up" | "down" | "left" | "right";
 const ANGLE: Record<Dir, number> = { right: 0, down: 90, left: 180, up: 270 };
 
-/** Refrigerant state, drawn as a colour convention (blue = cold, red = hot) plus its own dash rhythm. */
-type RefState = "cold" | "cool" | "hot" | "warm";
-type RefSize = "gas" | "liquid";
+/** The only three flow colours. */
+type Flow = "heat" | "cool" | "water";
 type ClassName = string | undefined;
 
 const cx = (...c: (ClassName | false)[]) => c.filter(Boolean).join(" ");
@@ -266,88 +248,38 @@ const getFalse = () => false;
 /*  SVG building blocks                                                       */
 /* ========================================================================== */
 
-const refStateClass: Record<RefState, ClassName> = {
-  cold: styles.refCold,
-  cool: styles.refCool,
-  hot: styles.refHot,
-  warm: styles.refWarm,
-};
-const refArrowClass: Record<RefState, ClassName> = {
-  cold: styles.refArrowCold,
-  cool: styles.refArrowCool,
-  hot: styles.refArrowHot,
-  warm: styles.refArrowWarm,
-};
+const lineClass: Record<Flow, ClassName> = { heat: styles.lineHeat, cool: styles.lineCool, water: styles.lineWater };
+const beadClass: Record<Flow, ClassName> = { heat: styles.beadThin, cool: styles.beadThin, water: styles.beadThick };
+const arrowClass: Record<Flow, ClassName> = { heat: styles.arrowHeat, cool: styles.arrowCool, water: styles.arrowWater };
 
-/** Copper-rimmed refrigerant pipe with dashes flowing inside. The gas pipe is larger. */
-function RefPipe({ d, state, size, still }: { d: string; state: RefState; size: RefSize; still?: boolean }) {
-  const big = size === "gas";
+/** One flow: a single stroked line with light beads travelling along it. */
+function FlowLine({ d, flow, still }: { d: string; flow: Flow; still?: boolean }) {
   return (
     <>
-      <path className={big ? styles.refRimGas : styles.refRimLiquid} d={d} />
-      <path className={big ? styles.refCoreGas : styles.refCoreLiquid} d={d} />
-      <path
-        className={cx(styles.refFlow, big ? styles.refFlowGas : styles.refFlowLiquid, refStateClass[state], still && styles.still)}
-        d={d}
-      />
+      <path className={cx(styles.line, lineClass[flow])} d={d} />
+      <path className={cx(styles.bead, beadClass[flow], still && styles.still)} d={d} />
     </>
   );
 }
 
-function RefArrow({ x, y, dir, state, size }: { x: number; y: number; dir: Dir; state: RefState; size: RefSize }) {
-  const s = size === "gas" ? 1 : 0.8;
+/** Direction arrowhead sitting on a flow line. */
+function Arrow({ x, y, dir, flow }: { x: number; y: number; dir: Dir; flow: Flow }) {
+  const s = flow === "water" ? 1.25 : 1;
   return (
     <path
-      className={refArrowClass[state]}
-      d="M -7 -9 L 7 0 L -7 9 Z"
+      className={arrowClass[flow]}
+      d="M -6 -7 L 7 0 L -6 7 Z"
       transform={`translate(${x} ${y}) rotate(${ANGLE[dir]}) scale(${s})`}
     />
   );
 }
 
-/** Wide, double-outlined water pipe with round bubbles flowing inside. */
-function WaterPipe({ d, ret, still }: { d: string; ret?: boolean; still?: boolean }) {
+/** Bow-tie valve symbol (line art) on a horizontal line. */
+function Valve({ x, y, r, title }: { x: number; y: number; r: number; title: string }) {
   return (
-    <>
-      <path className={styles.waterRim} d={d} />
-      <path className={styles.waterCore} d={d} />
-      <path className={cx(styles.waterFlow, ret ? styles.waterReturn : styles.waterSupply, still && styles.still)} d={d} />
-    </>
-  );
-}
-
-function WaterArrow({ x, y, dir, ret, s = 1 }: { x: number; y: number; dir: Dir; ret?: boolean; s?: number }) {
-  return (
-    <path
-      className={ret ? styles.waterArrowReturn : styles.waterArrow}
-      d="M -6 -8 L 7 0 L -6 8 Z"
-      transform={`translate(${x} ${y}) rotate(${ANGLE[dir]}) scale(${s})`}
-    />
-  );
-}
-
-/** Bow-tie valve symbol on a horizontal pipe. */
-function Valve({
-  x,
-  y,
-  r,
-  className,
-  title,
-  stemDown,
-}: {
-  x: number;
-  y: number;
-  r: number;
-  className?: ClassName;
-  title: string;
-  stemDown?: boolean;
-}) {
-  const s = stemDown ? 1 : -1;
-  return (
-    <g className={className} transform={`translate(${x} ${y})`}>
+    <g className={styles.valve} transform={`translate(${x} ${y})`}>
       <title>{title}</title>
-      <path d={`M ${-r} ${-r} L 0 0 L ${-r} ${r} Z M ${r} ${-r} L 0 0 L ${r} ${r} Z`} />
-      <path d={`M 0 0 V ${s * (r + 5)} M ${-r * 0.6} ${s * (r + 5)} H ${r * 0.6}`} className={styles.valveStem} />
+      <path d={`M ${-r} ${-r} L ${r} ${r} V ${-r} L ${-r} ${r} Z`} />
     </g>
   );
 }
@@ -412,7 +344,7 @@ function Pill({
   const width = Math.min(maxWidth, textWidth * scale + padX * 2);
   return (
     <>
-      <rect x={centreX - width / 2} y={cy - height / 2} width={width} height={height} rx={Math.min(height / 2, 22)} className={bgClassName} />
+      <rect x={centreX - width / 2} y={cy - height / 2} width={width} height={height} rx={Math.min(height / 2, 20)} className={bgClassName} />
       <g transform={`translate(${centreX} ${cy}) scale(${scale})`}>
         <g ref={textRef}>
           {lines.map((l) => (
@@ -424,11 +356,6 @@ function Pill({
       </g>
     </>
   );
-}
-
-/** Legend swatch for a refrigerant pipe: identical to the pipe it describes, but still. */
-function RefSwatch({ x, y, state, size }: { x: number; y: number; state: RefState; size: RefSize }) {
-  return <RefPipe d={`M ${x} ${y} H ${x + 46}`} state={state} size={size} still />;
 }
 
 /* ========================================================================== */
@@ -460,14 +387,10 @@ export default function WaterCooledACAnimation({
   const ids = {
     title: `${uid}-title`,
     desc: `${uid}-desc`,
-    hatch: `${uid}-hatch`,
-    shadow: `${uid}-shadow`,
-    headWarm: `${uid}-head-warm`,
-    headCool: `${uid}-head-cool`,
-    headHeat: `${uid}-head-heat`,
-    headRef: `${uid}-head-ref`,
-    headWater: `${uid}-head-water`,
     boxClip: `${uid}-box-clip`,
+    headHeat: `${uid}-head-heat`,
+    headCool: `${uid}-head-cool`,
+    headGrey: `${uid}-head-grey`,
   };
 
   const duration = Number.isFinite(stepDuration) ? Math.max(1500, stepDuration) : 7000;
@@ -489,7 +412,7 @@ export default function WaterCooledACAnimation({
   const hydrated = useSyncExternalStore(subscribeNothing, getTrue, getFalse);
 
   const playing = userPlaying ?? (autoPlay && !reducedMotion);
-  /** Particles and pulses run while playing and visible. */
+  /** Flow motion and pulses run while playing and visible. */
   const moving = playing && !tabHidden && inView;
   /** The step timer also needs hydration, and holds while a keyboard user is in the controls. */
   const advancing = hydrated && moving && !keyboardInControls;
@@ -581,40 +504,29 @@ export default function WaterCooledACAnimation({
           <desc id={ids.desc}>{LABELS.svgDesc}</desc>
 
           <defs>
-            <pattern id={ids.hatch} width="14" height="14" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-              <rect width="14" height="14" className={styles.wallFill} />
-              <line x1="0" y1="0" x2="0" y2="14" className={styles.wallHatch} />
-            </pattern>
             <clipPath id={ids.boxClip}>
               <rect x={CASING.x} y={CASING.y} width={CASING.w} height={CASING.h} rx={CASING.r} />
             </clipPath>
-            <filter id={ids.shadow} x="-20%" y="-20%" width="140%" height="150%">
-              <feDropShadow dx="0" dy="4" stdDeviation="5" floodColor="#0b2340" floodOpacity="0.14" />
-            </filter>
             {(
               [
-                [ids.headWarm, styles.headWarm, 4],
-                [ids.headCool, styles.headCool, 4],
-                [ids.headHeat, styles.headWarm, 3.4],
-                [ids.headRef, styles.headRef, 3.6],
-                [ids.headWater, styles.headWater, 3.6],
+                [ids.headHeat, styles.headHeat],
+                [ids.headCool, styles.headCool],
+                [ids.headGrey, styles.headGrey],
               ] as const
-            ).map(([id, cls, size]) => (
-              <marker key={id} id={id} viewBox="0 0 10 10" refX="5" refY="5" markerWidth={size} markerHeight={size} orient="auto-start-reverse">
+            ).map(([id, cls]) => (
+              <marker key={id} id={id} viewBox="0 0 10 10" refX="4" refY="5" markerWidth="3.4" markerHeight="3.4" orient="auto-start-reverse">
                 <path d="M 0 0 L 10 5 L 0 10 Z" className={cls} />
               </marker>
             ))}
           </defs>
 
-          {/* ---------------- Building section ---------------- */}
+          {/* ---------------- Building section (grey line art) ---------------- */}
           <rect x="0" y="0" width={VB_W} height={VB_H} className={styles.svgBg} />
-          <rect x="0" y="20" width="300" height="446" className={styles.roomFill} />
-          <rect x="336" y="20" width="464" height="446" className={styles.plantFill} />
-          <rect x="300" y="20" width="36" height="446" fill={`url(#${ids.hatch})`} />
-          <rect x="0" y="0" width={VB_W} height="20" className={styles.slab} />
-          <rect x="0" y="466" width={VB_W} height="14" className={styles.slab} />
+          <rect x="300" y="20" width="36" height="446" className={styles.wall} />
+          <path d="M 300 20 V 466 M 336 20 V 466" className={styles.contextLine} />
+          <path d={`M 0 20 H ${VB_W} M 0 466 H ${VB_W}`} className={styles.contextLine} />
 
-          <text x="16" y="54" className={styles.areaLabel}>{LABELS.room}</text>
+          <text x="16" y="56" className={styles.areaLabel}>{LABELS.room}</text>
           <text x="348" y="58" className={styles.areaLabel}>{LABELS.cupboard}</text>
 
           {/* ---------------- Water zone, outside the casing ---------------- */}
@@ -622,8 +534,7 @@ export default function WaterCooledACAnimation({
 
           {/* ---------------- Condensate drain: secondary, never lit ---------------- */}
           <g className={styles.drainGroup}>
-            <path d={PATHS.drain} className={styles.drain} />
-            <path d="M 104 454 L 112 466 L 120 454" className={styles.drain} />
+            <path d={PATHS.drain} className={styles.drain} markerEnd={`url(#${ids.headGrey})`} />
             {LABELS.condensateDrain.map((line, i) => (
               <text key={line} x="124" y={374 + i * 26} className={styles.drainLabel}>
                 {line}
@@ -631,103 +542,75 @@ export default function WaterCooledACAnimation({
             ))}
           </g>
 
-          {/* Sofa (drawn over the drain) */}
-          <g className={styles.furniture} aria-hidden="true">
-            <rect x="170" y="402" width="104" height="38" rx="12" />
-            <rect x="160" y="428" width="124" height="28" rx="9" />
-            <rect x="150" y="414" width="28" height="44" rx="11" />
-            <rect x="266" y="414" width="28" height="44" rx="11" />
-            <rect x="160" y="456" width="8" height="10" rx="3" />
-            <rect x="276" y="456" width="8" height="10" rx="3" />
-          </g>
-
           {/* ---------------- Condenser casing (no fan, no grille) + water zone inside it ---------------- */}
-          <rect x={CASING.x} y={CASING.y} width={CASING.w} height={CASING.h} rx={CASING.r} className={styles.box} filter={`url(#${ids.shadow})`} />
+          <rect x={CASING.x} y={CASING.y} width={CASING.w} height={CASING.h} rx={CASING.r} className={styles.casing} />
           <path d={PATHS.zone} className={styles.zone} clipPath={`url(#${ids.boxClip})`} data-emphasis={on(step >= 3)} />
 
-          {/* ---------------- Building water loop ---------------- */}
+          {/* ---------------- Building water loop (mid blue, thicker) ---------------- */}
           <g className={styles.part} {...part("water")}>
-            <WaterPipe d={PATHS.returnRiser} ret />
-            <WaterPipe d={PATHS.flowRiser} />
-            <WaterPipe d={PATHS.returnTap} ret />
-            <WaterPipe d={PATHS.flowTap} />
-            <WaterArrow x={708} y={150} dir="up" ret />
-            <WaterArrow x={708} y={440} dir="up" ret />
-            <WaterArrow x={752} y={150} dir="down" />
-            <WaterArrow x={752} y={440} dir="down" />
-            <WaterArrow x={682} y={276} dir="right" ret />
-            <WaterArrow x={682} y={350} dir="left" />
-            <Valve x={648} y={276} r={11} className={styles.isoValve} title={LABELS.tooltips.isolationValve} stemDown />
-            <Valve x={648} y={350} r={11} className={styles.isoValve} title={LABELS.tooltips.isolationValve} />
-            <text x="676" y="252" textAnchor="end" className={styles.tapLabel}>{LABELS.waterOut}</text>
-            <text x="676" y="398" textAnchor="end" className={styles.tapLabel}>{LABELS.waterIn}</text>
-            {/* To the rooftop coolers, from the top of the return riser */}
-            <WaterArrow x={708} y={34} dir="up" ret s={1.6} />
+            <FlowLine d={PATHS.returnRiser} flow="water" />
+            <FlowLine d={PATHS.flowRiser} flow="water" />
+            <FlowLine d={PATHS.returnTap} flow="water" />
+            <path d={PATHS.flowHop} className={styles.hopGap} />
+            <FlowLine d={PATHS.flowTap} flow="water" />
+            <Arrow x={708} y={150} dir="up" flow="water" />
+            <Arrow x={708} y={430} dir="up" flow="water" />
+            <Arrow x={752} y={150} dir="down" flow="water" />
+            <Arrow x={752} y={430} dir="down" flow="water" />
+            <Arrow x={672} y={280} dir="right" flow="water" />
+            <Arrow x={672} y={350} dir="left" flow="water" />
+            <Valve x={636} y={280} r={9} title={LABELS.tooltips.isolationValve} />
+            <Valve x={636} y={350} r={9} title={LABELS.tooltips.isolationValve} />
+            {/* Heat leaves the building at the rooftop coolers */}
+            <path d="M 690 84 V 36" className={styles.roofArrow} markerEnd={`url(#${ids.headHeat})`} />
             {LABELS.toRoof.map((line, i) => (
-              <text key={line} x="672" y={48 + i * 28} textAnchor="end" className={styles.noteLabel}>
+              <text key={line} x="674" y={50 + i * 28} textAnchor="end" className={styles.noteLabel}>
                 {line}
               </text>
             ))}
           </g>
 
-          {/* ---------------- Refrigerant pipes (drawn over the casing so the loop is continuous) ---------------- */}
+          {/* ---------------- Refrigerant: two thin light-blue lines through the wall ---------------- */}
           <g className={styles.part} {...part("liquid")}>
-            <title>{LABELS.tooltips.liquidPipe}</title>
-            <RefPipe d={PATHS.liquid} state="cold" size="liquid" />
-            <RefArrow x={358} y={300} dir="up" state="cold" size="liquid" />
-            <RefArrow x={430} y={406} dir="left" state="cold" size="liquid" />
+            <FlowLine d={PATHS.liquid} flow="cool" />
+            <Arrow x={358} y={300} dir="up" flow="cool" />
+            <Arrow x={326} y={146} dir="left" flow="cool" />
           </g>
           <g className={styles.part} {...part("suction")}>
-            <title>{LABELS.tooltips.gasPipe}</title>
-            <path d={PATHS.suction} className={styles.glowCool} />
-            <RefPipe d={PATHS.suction} state="cool" size="gas" />
-            <RefArrow x={380} y={126} dir="right" state="cool" size="gas" />
-            <RefArrow x={404} y={186} dir="down" state="cool" size="gas" />
+            <FlowLine d={PATHS.suction} flow="cool" />
+            <Arrow x={318} y={126} dir="right" flow="cool" />
+            <Arrow x={404} y={196} dir="down" flow="cool" />
           </g>
 
           <g className={styles.part} {...part("discharge")}>
-            <path d={PATHS.discharge} className={styles.glowHot} />
-            <RefPipe d={PATHS.discharge} state="hot" size="gas" />
-            <RefArrow x={486} y={290} dir="up" state="hot" size="gas" />
+            <FlowLine d={PATHS.discharge} flow="heat" />
+            <Arrow x={486} y={290} dir="up" flow="heat" />
           </g>
 
           <g className={styles.part} {...part("warmLiquid")}>
-            <RefPipe d={PATHS.warmLiquid} state="warm" size="liquid" />
+            <FlowLine d={PATHS.warmLiquid} flow="cool" />
           </g>
 
           <g className={styles.part} {...part("valve")}>
-            <Valve x={470} y={406} r={10} className={styles.expValve} title={LABELS.tooltips.expansionValve} />
+            <Valve x={470} y={406} r={8} title={LABELS.tooltips.expansionValve} />
           </g>
 
           <g className={styles.part} {...part("compressor")}>
             <rect x="386" y="248" width="80" height="140" rx="38" className={styles.halo} data-on={ring("compressor")} />
             <g className={styles.compressorBody}>
-              <rect x="396" y="258" width="60" height="120" rx="30" className={styles.compressor} />
-              <rect x="404" y="272" width="7" height="92" rx="3.5" className={styles.compressorShine} />
-              <path d={SCROLL_PATH} className={styles.scroll} />
+              <rect x="396" y="258" width="60" height="120" rx="30" className={styles.equipment} />
+              <path d={SCROLL_PATH} className={styles.detailLine} />
             </g>
           </g>
 
           <g className={styles.part} {...part("hx")}>
-            <rect x="513" y="257" width="98" height="122" rx="14" className={styles.halo} data-on={ring("hx")} />
-            <rect x="520" y="264" width="84" height="108" rx="10" className={styles.hx} />
-            {[0, 1, 2, 3, 4, 5].map((i) => (
-              <rect
-                key={i}
-                x={528 + i * 12}
-                y="272"
-                width="8"
-                height="92"
-                rx="4"
-                className={i % 2 === 0 ? styles.plateRef : styles.plateWater}
-              />
-            ))}
-            {/* Counterflow inside the plates, and heat crossing from refrigerant to water */}
+            <rect x="510" y="254" width="104" height="128" rx="14" className={styles.halo} data-on={ring("hx")} />
+            <rect x="520" y="264" width="84" height="108" rx="8" className={styles.equipment} />
+            <path d="M 538 276 V 360 M 556 276 V 360 M 574 276 V 360 M 592 276 V 360" className={styles.plates} />
+            {/* Heat crossing from the refrigerant side to the water side */}
             <g className={styles.hxDetail}>
-              <path d="M 532 280 V 356" className={styles.hxRefLine} markerEnd={`url(#${ids.headRef})`} />
-              <path d="M 592 356 V 280" className={styles.hxWaterLine} markerEnd={`url(#${ids.headWater})`} />
-              {[288, 350].map((y) => (
-                <path key={y} d={`M 544 ${y} q 6 -7 12 0 q 6 7 12 0`} className={styles.heatLine} markerEnd={`url(#${ids.headHeat})`} />
+              {[300, 340].map((y) => (
+                <path key={y} d={`M 538 ${y} q 7 -8 14 0 q 7 8 14 0 q 7 -8 14 0`} className={styles.heatMark} markerEnd={`url(#${ids.headHeat})`} />
               ))}
             </g>
           </g>
@@ -776,24 +659,23 @@ export default function WaterCooledACAnimation({
           {/* ---------------- Room: air and wall unit ---------------- */}
           <g className={styles.part} {...part("air")}>
             {[192, 232, 272].map((x) => (
-              <path key={x} d={`M ${x} 26 q 6 5 0 10 q -6 5 0 10 q 6 5 0 10`} className={styles.airWarm} markerEnd={`url(#${ids.headWarm})`} />
+              <path key={x} d={`M ${x} 26 q 6 5 0 10 q -6 5 0 10 q 6 5 0 10`} className={styles.airHeat} markerEnd={`url(#${ids.headHeat})`} />
             ))}
             {[168, 210, 252].map((x) => (
-              <path key={x} d={`M ${x} 178 Q ${x - 8} 204 ${x - 34} 226`} className={styles.airCool} markerEnd={`url(#${ids.headCool})`} />
+              <path key={x} d={`M ${x} 180 Q ${x - 8} 204 ${x - 32} 224`} className={styles.airCool} markerEnd={`url(#${ids.headCool})`} />
             ))}
           </g>
 
           <g className={styles.part} {...part("unit")}>
-            <rect x="90" y="60" width="204" height="120" rx="24" className={styles.halo} data-on={ring("unit")} />
-            <rect x="100" y="70" width="184" height="100" rx="16" className={styles.unit} filter={`url(#${ids.shadow})`} />
-            <line x1="114" y1="162" x2="270" y2="162" className={styles.louvre} />
+            <rect x="90" y="60" width="204" height="120" rx="22" className={styles.halo} data-on={ring("unit")} />
+            <rect x="100" y="70" width="184" height="100" rx="14" className={styles.equipment} />
+            <path d="M 118 160 H 266" className={styles.detailLine} />
             <text x="192" y="106" textAnchor="middle" className={styles.unitLabel}>
               {LABELS.wallUnit}
             </text>
           </g>
           <g className={styles.part} {...part("coil")}>
-            <RefPipe d={PATHS.coilIn} state="cold" size="liquid" />
-            <RefPipe d={PATHS.coilOut} state="cool" size="gas" />
+            <FlowLine d={PATHS.coil} flow="cool" />
           </g>
 
           {/* ---------------- Badge + leader to the pipes in the wall ---------------- */}
@@ -831,26 +713,14 @@ export default function WaterCooledACAnimation({
             </g>
           </g>
 
-          {/* ---------------- Step markers ---------------- */}
-          {MARKERS.map((m) => (
-            <g key={m.n} className={styles.marker} data-on={on(step === m.n - 1)} transform={`translate(${m.x} ${m.y})`}>
-              <circle r="19" className={styles.markerDisc} />
-              <text y="9" textAnchor="middle" className={styles.markerText}>
-                {m.n}
-              </text>
-            </g>
-          ))}
-
-          {/* ---------------- Legend (2 × 2); each swatch is the pipe it names ---------------- */}
+          {/* ---------------- Legend: the three flow lines ---------------- */}
           <g className={styles.legend}>
-            <RefSwatch x={16} y={500} state="cold" size="liquid" />
-            <text x="72" y="509" className={styles.legendText}>{LABELS.legendCold}</text>
-            <RefSwatch x={414} y={500} state="cool" size="gas" />
-            <text x="470" y="509" className={styles.legendText}>{LABELS.legendCool}</text>
-            <RefSwatch x={16} y={531} state="hot" size="gas" />
-            <text x="72" y="540" className={styles.legendText}>{LABELS.legendHot}</text>
-            <WaterPipe d="M 414 531 H 460" still />
-            <text x="470" y="540" className={styles.legendText}>{LABELS.legendWater}</text>
+            <FlowLine d="M 18 498 H 58" flow="heat" still />
+            <text x="68" y="507" className={styles.legendText}>{LABELS.legendHeat}</text>
+            <FlowLine d="M 196 498 H 236" flow="cool" still />
+            <text x="246" y="507" className={styles.legendText}>{LABELS.legendCool}</text>
+            <FlowLine d="M 372 498 H 412" flow="water" still />
+            <text x="422" y="507" className={styles.legendText}>{LABELS.legendWater}</text>
           </g>
         </svg>
       </div>

@@ -2,53 +2,33 @@
    Water-cooled AC animation (Urban Cooling)
    --------------------------------------------------------------------------
    BRAND TOKENS
+   Line art in black and greys; colour is used only for the three flows.
    The public API is the --uc-* custom properties. Set any of them on the
    component (via className), on a wrapper, or globally (:root); the values
    below are only fallbacks. Internally the component reads private --_uc-*
    copies, so an override always wins regardless of stylesheet order.
 
-   Keep graphic colours at >= 3:1 against --uc-room / --uc-pipe-core / white,
-   and --uc-primary / --uc-ink / --uc-focus at >= 4.5:1 for text.
+   The three flow colours are chosen to differ in lightness as well as hue
+   (water darkest, heat middle, cool lightest), so they stay distinct in
+   greyscale and for red-green colour blindness. Water is also thicker.
    ========================================================================== */
 .root {
-  /* Surfaces & text */
-  --_uc-bg: var(--uc-bg, #f2f6fb);                    /* background inside the square */
-  --_uc-surface: var(--uc-surface, #ffffff);          /* wall unit, condenser casing, caption band */
-  --_uc-ink: var(--uc-ink, #0b2340);                  /* deep navy: outlines, headings, body text */
-  --_uc-muted: var(--uc-muted, #55667d);              /* quieter labels */
-  --_uc-primary: var(--uc-primary, #1747a6);          /* clean blue: active step, caption titles, callouts */
-  --_uc-accent: var(--uc-accent, #0c9a6c);            /* fresh accent: highlight rings, badge edge, leader */
-  --_uc-focus: var(--uc-focus, #1747a6);              /* keyboard focus ring */
+  /* Neutrals */
+  --_uc-bg: var(--uc-bg, #ffffff);              /* background inside the square */
+  --_uc-ink: var(--uc-ink, #15181d);            /* near-black: equipment, labels, controls */
+  --_uc-grey-1: var(--uc-grey-1, #4b525c);      /* dark grey: body text, secondary labels, leader */
+  --_uc-grey-2: var(--uc-grey-2, #8b929c);      /* mid grey: room/wall lines, water-zone outline */
+  --_uc-grey-3: var(--uc-grey-3, #d5d9de);      /* light grey: drain, plates, borders, soft fills */
+  --_uc-focus: var(--uc-focus, #15181d);        /* keyboard focus ring */
   --_uc-font: var(--uc-font, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif);
-  --_uc-max-width: var(--uc-max-width, 760px);        /* designed for 320–760px */
+  --_uc-max-width: var(--uc-max-width, 760px);  /* designed for 320–760px */
 
-  /* Refrigerant states (diagram convention: blue = cold, red = hot) */
-  --_uc-refrigerant-cold: var(--uc-refrigerant-cold, #3346c9); /* cold liquid, after the expansion valve */
-  --_uc-refrigerant-cool: var(--uc-refrigerant-cool, #0b8a9c); /* cool gas carrying the room's heat */
-  --_uc-refrigerant-hot: var(--uc-refrigerant-hot, #e03131);   /* hot gas, after the compressor */
-  --_uc-refrigerant-warm: var(--uc-refrigerant-warm, #d9650a); /* warm liquid, after the heat exchanger */
+  /* The only three flow colours */
+  --_uc-heat: var(--uc-heat, #e8412f);          /* red: heat (hot refrigerant, warm air, heat out) */
+  --_uc-cool: var(--uc-cool, #4fb3f0);          /* light blue: cool refrigerant and cool air */
+  --_uc-water: var(--uc-water, #1857ba);        /* mid blue: building water (drawn thicker) */
 
-  /* Building water, heat and air */
-  --_uc-water-flow: var(--uc-water-flow, #1f74e0);     /* loop flow: cooler water in */
-  --_uc-water-return: var(--uc-water-return, #7fb0f5); /* loop return: warmed water out */
-  --_uc-heat: var(--uc-heat, #d97706);                 /* heat and warm room air */
-  --_uc-air-cool: var(--uc-air-cool, #0284c7);         /* cooled room air */
-
-  /* Illustration neutrals */
-  --_uc-pipe-copper: var(--uc-pipe-copper, #b8743f);         /* refrigerant pipe rim */
-  --_uc-pipe-core: var(--uc-pipe-core, #fbf5ee);             /* refrigerant pipe interior */
-  --_uc-pipe-water-edge: var(--uc-pipe-water-edge, #2f5177); /* water pipe double outline */
-  --_uc-pipe-water-core: var(--uc-pipe-water-core, #e8f1ff); /* water pipe interior */
-  --_uc-drain: var(--uc-drain, #9aa5b4);                     /* condensate drain pipe */
-  --_uc-drain-text: var(--uc-drain-text, #6b7789);           /* condensate drain label */
-  --_uc-wall: var(--uc-wall, #c9d4e2);
-  --_uc-wall-hatch: var(--uc-wall-hatch, #b1bfd1);
-  --_uc-slab: var(--uc-slab, #d6dfea);
-  --_uc-room: var(--uc-room, #ffffff);
-  --_uc-plant: var(--uc-plant, #e8eef6);
-  --_uc-furniture: var(--uc-furniture, #d6e0ec);
-  --_uc-compressor: var(--uc-compressor, #46597a);
-  --_uc-dim: var(--uc-dim, 0.26);                            /* opacity of parts not in the current step */
+  --_uc-dim: var(--uc-dim, 0.22);               /* opacity of parts not in the current step */
 
   /* --_uc-step-ms is set inline from the stepDuration prop. */
 
@@ -66,8 +46,11 @@
   background: var(--_uc-bg);
   color: var(--_uc-ink);
   font-family: var(--_uc-font);
+  /* Hairline frame drawn inside the box, so it takes no layout width. */
+  outline: 1px solid var(--_uc-grey-3);
+  outline-offset: -1px;
   border-radius: 14px;
-  border-radius: clamp(10px, 2.5cqi, 20px);
+  border-radius: clamp(10px, 2.5cqi, 18px);
 }
 
 .root *,
@@ -101,7 +84,7 @@
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--_uc-accent);
+  color: var(--_uc-grey-1);
 }
 .headline {
   margin: 0.15em 0 0;
@@ -132,40 +115,64 @@
 }
 
 .svgBg { fill: var(--_uc-bg); }
-.roomFill { fill: var(--_uc-room); }
-.plantFill { fill: var(--_uc-plant); }
-.slab { fill: var(--_uc-slab); }
-.wallFill { fill: var(--_uc-wall); }
-.wallHatch { stroke: var(--_uc-wall-hatch); stroke-width: 4; }
-.furniture { fill: var(--_uc-furniture); }
+
+/* --------------------------------------------------------- Line art */
+/* Context (room, wall, slabs): thin grey. Equipment: black, 2.75. */
+.contextLine {
+  fill: none;
+  stroke: var(--_uc-grey-2);
+  stroke-width: 1.75;
+  stroke-linecap: round;
+}
+.wall {
+  fill: var(--_uc-grey-3);
+  fill-opacity: 0.35;
+}
+.equipment,
+.casing {
+  fill: var(--_uc-bg);
+  stroke: var(--_uc-ink);
+  stroke-width: 2.75;
+  stroke-linejoin: round;
+}
+.detailLine {
+  fill: none;
+  stroke: var(--_uc-ink);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.plates {
+  fill: none;
+  stroke: var(--_uc-grey-3);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+.valve path {
+  fill: var(--_uc-bg);
+  stroke: var(--_uc-ink);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
 
 /* ------------------------------------------------------------ Type scale */
-/* Phones (container < 480px): everything is 26 units, about 11px at 340px. */
+/* Phones (container < 480px): every label is 26 units, about 11px at 340px. */
 .areaLabel,
 .componentLabel,
 .unitLabel,
 .legendText,
 .noteLabel,
-.tapLabel,
 .drainLabel,
 .zoneTagText,
-.calloutText,
-.markerText {
+.calloutText {
   font-size: 26px;
 }
-.areaLabel { font-weight: 700; fill: var(--_uc-muted); }
+.areaLabel { font-weight: 700; fill: var(--_uc-grey-1); }
 .componentLabel,
 .unitLabel { font-weight: 700; fill: var(--_uc-ink); }
 .legendText { font-weight: 600; fill: var(--_uc-ink); }
-.noteLabel,
-.tapLabel { font-weight: 600; fill: var(--_uc-muted); }
-.tapLabel {
-  paint-order: stroke;
-  stroke: var(--_uc-surface);
-  stroke-width: 6px;
-  stroke-linejoin: round;
-}
-.drainLabel { font-weight: 500; fill: var(--_uc-drain-text); }
+.noteLabel { font-weight: 600; fill: var(--_uc-grey-1); }
+.drainLabel { font-weight: 500; fill: var(--_uc-grey-1); }
 
 /* Wider containers: three tiers, kept below the caption's visual weight. */
 @container (min-width: 480px) {
@@ -177,15 +184,13 @@
   }
   .legendText,
   .noteLabel,
-  .tapLabel,
   .drainLabel {
     font-size: 20px;
     font-weight: 500;
   }
-  .legendText { fill: var(--_uc-muted); }
+  .legendText { fill: var(--_uc-grey-1); }
   .zoneTagText,
-  .calloutText,
-  .markerText {
+  .calloutText {
     font-size: 23px;
   }
   .componentLabel,
@@ -206,209 +211,92 @@
   animation-play-state: paused;
 }
 
-/* --------------------------------------------------------- Refrigerant */
-/* Slim copper-rimmed pipes. The gas pipe is visibly larger than the liquid pipe.
-   Each temperature has its own dash rhythm as well as its colour:
-   cold = short ticks, cool = short dashes, warm = long dashes, hot = near-solid. */
-.refRimGas,
-.refRimLiquid,
-.refCoreGas,
-.refCoreLiquid,
-.refFlow {
+/* ------------------------------------------------------------- Flows */
+/* One line per flow, with light beads travelling along it. */
+.line {
   fill: none;
-  stroke-linejoin: round;
-  stroke-linecap: butt;
-}
-.refRimGas { stroke: var(--_uc-pipe-copper); stroke-width: 17; }
-.refCoreGas { stroke: var(--_uc-pipe-core); stroke-width: 11; }
-.refRimLiquid { stroke: var(--_uc-pipe-copper); stroke-width: 11; }
-.refCoreLiquid { stroke: var(--_uc-pipe-core); stroke-width: 6; }
-
-.refFlow {
-  animation-timing-function: linear;
-  animation-iteration-count: infinite;
-}
-.refFlowGas { stroke-width: 6; }
-.refFlowLiquid { stroke-width: 4; }
-
-.refCold { stroke: var(--_uc-refrigerant-cold); stroke-dasharray: 4 6; animation-name: dash20; animation-duration: 450ms; }
-.refCool { stroke: var(--_uc-refrigerant-cool); stroke-dasharray: 9 6; animation-name: dash30; animation-duration: 650ms; }
-.refWarm { stroke: var(--_uc-refrigerant-warm); stroke-dasharray: 14 5; animation-name: dash38; animation-duration: 850ms; }
-.refHot { stroke: var(--_uc-refrigerant-hot); stroke-dasharray: 20 4; animation-name: dash48; animation-duration: 1050ms; }
-
-.refArrowCold,
-.refArrowCool,
-.refArrowHot,
-.refArrowWarm {
-  stroke: var(--_uc-surface);
-  stroke-width: 2.5;
-  stroke-linejoin: round;
-  paint-order: stroke;
-}
-.refArrowCold { fill: var(--_uc-refrigerant-cold); }
-.refArrowCool { fill: var(--_uc-refrigerant-cool); }
-.refArrowHot { fill: var(--_uc-refrigerant-hot); }
-.refArrowWarm { fill: var(--_uc-refrigerant-warm); }
-
-/* -------------------------------------------------------------- Water */
-/* Wide pipes with a double outline and round bubbles. */
-.waterRim,
-.waterCore,
-.waterFlow {
-  fill: none;
-  stroke-linejoin: round;
-  stroke-linecap: butt;
-}
-.waterRim { stroke: var(--_uc-pipe-water-edge); stroke-width: 26; }
-.waterCore { stroke: var(--_uc-pipe-water-core); stroke-width: 19; }
-.waterFlow {
-  stroke-width: 10;
   stroke-linecap: round;
-  stroke-dasharray: 0 22;
-  animation: waterFlow 1100ms linear infinite;
-}
-.waterSupply { stroke: var(--_uc-water-flow); }
-.waterReturn { stroke: var(--_uc-water-return); }
-.waterArrow,
-.waterArrowReturn {
-  stroke: var(--_uc-pipe-water-edge);
-  stroke-width: 2;
   stroke-linejoin: round;
 }
-.waterArrow { fill: var(--_uc-water-flow); }
-.waterArrowReturn { fill: var(--_uc-water-return); }
+.lineHeat { stroke: var(--_uc-heat); stroke-width: 4; }
+.lineCool { stroke: var(--_uc-cool); stroke-width: 4; }
+.lineWater { stroke: var(--_uc-water); stroke-width: 7; }
 
-/* Legend swatches are the real pipes, held still. */
+.bead {
+  fill: none;
+  stroke: var(--_uc-bg);
+  stroke-linecap: round;
+  stroke-opacity: 0.9;
+  stroke-dasharray: 0 22;
+  animation: travel 1000ms linear infinite;
+}
+.beadThin { stroke-width: 2; }
+.beadThick {
+  stroke-width: 3;
+  animation-duration: 1300ms;
+}
+
+.arrowHeat { fill: var(--_uc-heat); }
+.arrowCool { fill: var(--_uc-cool); }
+.arrowWater { fill: var(--_uc-water); }
+
+/* Where the flow tap hops over the return riser, cut a gap in the riser. */
+.hopGap {
+  fill: none;
+  stroke: var(--_uc-bg);
+  stroke-width: 15;
+}
+
+/* Legend samples are the real lines, held still. */
 .still {
   animation: none !important;
 }
 
-.isoValve,
-.expValve {
-  stroke-linejoin: round;
-}
-.isoValve path:first-of-type {
-  fill: var(--_uc-surface);
-  stroke: var(--_uc-pipe-water-edge);
-  stroke-width: 3;
-}
-.expValve path:first-of-type {
-  fill: var(--_uc-surface);
-  stroke: var(--_uc-ink);
-  stroke-width: 2.5;
-}
-.valveStem {
+/* Heat leaving the building at the rooftop coolers */
+.roofArrow {
   fill: none;
-  stroke: var(--_uc-ink);
-  stroke-width: 3;
+  stroke: var(--_uc-heat);
+  stroke-width: 4;
   stroke-linecap: round;
-}
-
-/* Glows under a pipe when it is the star of the step */
-.glowHot,
-.glowCool {
-  fill: none;
-  stroke-width: 30;
-  stroke-linejoin: round;
-  stroke-linecap: round;
-  opacity: 0;
-  transition: opacity 400ms ease;
-}
-.glowHot { stroke: var(--_uc-refrigerant-hot); }
-.glowCool { stroke: var(--_uc-refrigerant-cool); }
-.root[data-step="3"] .glowHot { opacity: 0.2; animation: glow 1400ms ease-in-out infinite; }
-.root[data-step="2"] .glowCool { opacity: 0.2; animation: glow 1400ms ease-in-out infinite; }
-
-/* -------------------------------------------------------- Condensate */
-.drainGroup { opacity: 0.85; }
-.drain {
-  fill: none;
-  stroke: var(--_uc-drain);
-  stroke-width: 5;
-  stroke-linecap: round;
-  stroke-linejoin: round;
 }
 
 /* ------------------------------------------------------------- Air */
-.airWarm,
+.airHeat,
 .airCool {
   fill: none;
+  stroke-width: 4;
   stroke-linecap: round;
-}
-.airWarm {
-  stroke: var(--_uc-heat);
-  stroke-width: 5;
-  stroke-dasharray: 7 5;
+  stroke-dasharray: 8 6;
   animation: airFlow 900ms linear infinite;
 }
-.airCool {
-  stroke: var(--_uc-air-cool);
-  stroke-width: 6;
-  stroke-dasharray: 12 7;
-  animation: airFlow 900ms linear infinite;
-}
-.headWarm { fill: var(--_uc-heat); }
-.headCool { fill: var(--_uc-air-cool); }
-.headRef { fill: var(--_uc-refrigerant-warm); }
-.headWater { fill: var(--_uc-water-flow); }
+.airHeat { stroke: var(--_uc-heat); }
+.airCool { stroke: var(--_uc-cool); }
+.headHeat { fill: var(--_uc-heat); }
+.headCool { fill: var(--_uc-cool); }
+.headGrey { fill: var(--_uc-grey-3); }
 
 /* -------------------------------------------------------- Components */
-.unit,
-.box,
-.hx {
-  fill: var(--_uc-surface);
-  stroke: var(--_uc-ink);
-  stroke-width: 3;
-}
-.louvre {
-  stroke: var(--_uc-ink);
-  stroke-width: 3;
-  stroke-linecap: round;
-  opacity: 0.5;
-}
-
-.compressor {
-  fill: var(--_uc-compressor);
-  stroke: var(--_uc-ink);
-  stroke-width: 3;
-  transition: fill 500ms ease;
-}
-.root[data-step="3"] .compressor {
-  fill: var(--_uc-refrigerant-hot);
-  fill: color-mix(in srgb, var(--_uc-compressor) 50%, var(--_uc-refrigerant-hot));
-}
-.compressorShine { fill: #ffffff; opacity: 0.18; }
-.scroll {
-  fill: none;
-  stroke: var(--_uc-surface);
-  stroke-width: 3.5;
-  stroke-linecap: round;
-  opacity: 0.9;
-}
 .compressorBody {
   transform-box: fill-box;
   transform-origin: center;
 }
 .root[data-step="3"] .compressorBody { animation: squeeze 900ms ease-in-out infinite; }
 
-.plateRef { fill: var(--_uc-refrigerant-hot); opacity: 0.22; }
-.plateWater { fill: var(--_uc-water-flow); opacity: 0.26; }
-
 .hxDetail { opacity: 0; transition: opacity 400ms ease; }
 .root[data-step="4"] .hxDetail,
 .root[data-step="5"] .hxDetail { opacity: 1; }
-.hxRefLine,
-.hxWaterLine {
-  fill: none;
-  stroke-width: 4;
-  stroke-linecap: round;
-}
-.hxRefLine { stroke: var(--_uc-refrigerant-warm); }
-.hxWaterLine { stroke: var(--_uc-water-flow); }
-.heatLine {
+.heatMark {
   fill: none;
   stroke: var(--_uc-heat);
-  stroke-width: 4;
+  stroke-width: 3.5;
+  stroke-linecap: round;
+}
+
+/* -------------------------------------------------------- Condensate */
+.drain {
+  fill: none;
+  stroke: var(--_uc-grey-3);
+  stroke-width: 2.5;
   stroke-linecap: round;
 }
 
@@ -421,34 +309,37 @@
 .callout[data-on="false"] {
   opacity: 0;
 }
-.calloutBg { fill: var(--_uc-primary); }
+.calloutBg { fill: var(--_uc-ink); }
 .calloutText { font-weight: 650; fill: #ffffff; }
 
 /* ---------------------------------------------------------- Water zone */
 .zone {
-  fill: var(--_uc-water-flow);
-  fill-opacity: 0.07;
-  stroke: var(--_uc-water-flow);
-  stroke-width: 3;
-  stroke-dasharray: 12 8;
+  fill: var(--_uc-grey-3);
+  fill-opacity: 0.22;
+  stroke: var(--_uc-grey-2);
+  stroke-width: 2;
+  stroke-dasharray: 9 7;
   stroke-linejoin: round;
   transition: fill-opacity 500ms ease;
 }
 .zone[data-emphasis="true"] {
-  fill-opacity: 0.12;
-  stroke-width: 4;
-  animation: zoneMarch 1200ms linear infinite;
+  fill-opacity: 0.38;
+  stroke: var(--_uc-grey-1);
+  animation: zoneMarch 1400ms linear infinite;
 }
-.zoneTagBg { fill: var(--_uc-water-flow); }
-.zoneTagText { font-weight: 600; fill: #ffffff; }
+.zoneTagBg {
+  fill: var(--_uc-bg);
+  stroke: var(--_uc-grey-2);
+  stroke-width: 1.75;
+}
+.zoneTagText { font-weight: 600; fill: var(--_uc-grey-1); }
 
 /* --------------------------------------------------------------- Halos */
-/* Exactly one pulsing ring per step. */
+/* Exactly one ring per step: a dark outline with a gentle pulse. */
 .halo {
-  fill: var(--_uc-accent);
-  fill-opacity: 0.08;
-  stroke: var(--_uc-accent);
-  stroke-width: 4;
+  fill: none;
+  stroke: var(--_uc-ink);
+  stroke-width: 2.5;
   opacity: 0;
   transition: opacity 400ms ease;
 }
@@ -460,12 +351,15 @@
 /* -------------------------------------------------------------- Badge */
 .leader {
   fill: none;
-  stroke: var(--_uc-accent);
-  stroke-width: 3;
+  stroke: var(--_uc-grey-1);
+  stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-.badge[data-loud="true"] .leader { stroke-width: 4.5; }
+.badge[data-loud="true"] .leader {
+  stroke: var(--_uc-ink);
+  stroke-width: 3;
+}
 .badgeQuiet,
 .badgeLoud {
   transition: opacity 500ms ease;
@@ -475,9 +369,9 @@
 .badge[data-loud="true"] .badgeLoud { opacity: 1; }
 
 .badgeQuietBg {
-  fill: var(--_uc-surface);
-  stroke: var(--_uc-accent);
-  stroke-width: 3;
+  fill: var(--_uc-bg);
+  stroke: var(--_uc-ink);
+  stroke-width: 2.5;
 }
 .badgeTitleQuiet,
 .badgeTextQuiet,
@@ -486,32 +380,10 @@
   font-size: 26px;
 }
 .badgeTitleQuiet { font-weight: 700; fill: var(--_uc-ink); }
-.badgeTextQuiet { font-weight: 500; fill: var(--_uc-muted); }
-.badgeLoudBg {
-  fill: var(--_uc-ink);
-  stroke: var(--_uc-accent);
-  stroke-width: 4;
-}
+.badgeTextQuiet { font-weight: 500; fill: var(--_uc-grey-1); }
+.badgeLoudBg { fill: var(--_uc-ink); }
 .badgeTitleLoud { font-weight: 800; fill: #ffffff; }
-.badgeTextLoud { font-weight: 500; fill: #bdf2dc; }
-
-/* ------------------------------------------------------------ Markers */
-.markerDisc {
-  fill: var(--_uc-surface);
-  stroke: var(--_uc-muted);
-  stroke-width: 2.5;
-  transition: fill 300ms ease, stroke 300ms ease;
-}
-.markerText {
-  font-weight: 800;
-  fill: var(--_uc-muted);
-}
-.marker[data-on="true"] .markerDisc {
-  fill: var(--_uc-primary);
-  stroke: var(--_uc-surface);
-  stroke-width: 3;
-}
-.marker[data-on="true"] .markerText { fill: #ffffff; }
+.badgeTextLoud { font-weight: 500; fill: #ffffff; }
 
 /* ===================================================== Caption + controls */
 .band {
@@ -523,9 +395,8 @@
   gap: clamp(5px, 1.6cqi, 12px);
   padding: 12px 16px;
   padding: clamp(6px, 2.2cqi, 16px) clamp(8px, 4.5cqi - 7px, 24px) clamp(7px, 2.6cqi, 18px);
-  background: var(--_uc-surface);
-  border-top: 1px solid #e1e6ed;
-  border-top: 1px solid color-mix(in srgb, var(--_uc-ink) 10%, transparent);
+  background: var(--_uc-bg);
+  border-top: 1px solid var(--_uc-grey-3);
 }
 
 /* From 480px the stage keeps the drawing's exact ratio (no letterboxing)
@@ -533,7 +404,7 @@
 @container (min-width: 480px) {
   .stage {
     flex: 0 1 auto;
-    aspect-ratio: 800 / 548;
+    aspect-ratio: 800 / 516;
   }
   .band {
     flex: 1 1 auto;
@@ -549,11 +420,11 @@
   grid-area: 1 / 1;
   margin: 0;
   font-size: 15px;
-  font-size: clamp(12px, 0.25rem + 2.1cqi, 18px);
-  line-height: 1.36;
+  font-size: clamp(12px, 2.9cqi - 2px, 19px);
+  line-height: 1.38;
   letter-spacing: -0.003em;
   text-wrap: pretty;
-  color: var(--_uc-ink);
+  color: var(--_uc-grey-1);
   /* Out: fade 150ms, then hide. */
   opacity: 0;
   visibility: hidden;
@@ -566,7 +437,7 @@
   transition: opacity 150ms ease 150ms, visibility 0s linear 150ms;
 }
 .captionTitle {
-  color: var(--_uc-primary);
+  color: var(--_uc-ink);
   font-weight: 750;
 }
 
@@ -598,10 +469,9 @@
   height: var(--size);
   padding: 0;
   margin: 0;
-  border: 2px solid #b7c0cc;
-  border: 2px solid color-mix(in srgb, var(--_uc-ink) 30%, transparent);
+  border: 2px solid var(--_uc-grey-2);
   border-radius: 999px;
-  background: var(--_uc-surface);
+  background: var(--_uc-bg);
   color: var(--_uc-ink);
   font: inherit;
   font-size: 15px;
@@ -653,11 +523,11 @@
 @media (hover: hover) {
   .btn:hover,
   .pill:hover {
-    border-color: var(--_uc-primary);
+    border-color: var(--_uc-ink);
   }
   .btnPlay:hover {
-    background: var(--_uc-primary);
-    border-color: var(--_uc-primary);
+    background: var(--_uc-grey-1);
+    border-color: var(--_uc-grey-1);
   }
 }
 
@@ -668,8 +538,8 @@
 }
 
 .pill[data-on="true"] {
-  background: var(--_uc-primary);
-  border-color: var(--_uc-primary);
+  background: var(--_uc-ink);
+  border-color: var(--_uc-ink);
   color: #ffffff;
 }
 .pill > span:first-child {
@@ -682,7 +552,7 @@
 .progress {
   position: absolute;
   inset: 0;
-  background: rgba(255, 255, 255, 0.24);
+  background: rgba(255, 255, 255, 0.28);
   transform-origin: left center;
   transform: scaleX(0);
   animation: progress var(--_uc-step-ms, 7000ms) linear forwards;
@@ -723,7 +593,7 @@
 
 /* ----------------------------------------------------- Forced colours */
 @media (forced-colors: active) {
-  /* The diagram keeps its own palette, so pipes, zone and highlights stay visible. */
+  /* The diagram keeps its own palette, so flows, zone and highlights stay visible. */
   .svg {
     forced-color-adjust: none;
   }
@@ -747,23 +617,15 @@
 }
 
 /* --------------------------------------------------------- Keyframes */
-@keyframes dash20 { to { stroke-dashoffset: -20; } }
-@keyframes dash30 { to { stroke-dashoffset: -30; } }
-@keyframes dash38 { to { stroke-dashoffset: -38; } }
-@keyframes dash48 { to { stroke-dashoffset: -48; } }
-@keyframes waterFlow { to { stroke-dashoffset: -44; } }
-@keyframes airFlow { to { stroke-dashoffset: -24; } }
-@keyframes zoneMarch { to { stroke-dashoffset: -40; } }
+@keyframes travel { to { stroke-dashoffset: -44; } }
+@keyframes airFlow { to { stroke-dashoffset: -28; } }
+@keyframes zoneMarch { to { stroke-dashoffset: -32; } }
 @keyframes squeeze {
   0%, 100% { transform: scale(1, 1); }
   50% { transform: scale(0.9, 0.96); }
 }
-@keyframes glow {
-  0%, 100% { stroke-opacity: 0.6; }
-  50% { stroke-opacity: 1; }
-}
 @keyframes halo {
-  0%, 100% { stroke-opacity: 1; fill-opacity: 0.08; }
-  50% { stroke-opacity: 0.35; fill-opacity: 0.16; }
+  0%, 100% { stroke-opacity: 1; }
+  50% { stroke-opacity: 0.3; }
 }
 @keyframes progress { to { transform: scaleX(1); } }

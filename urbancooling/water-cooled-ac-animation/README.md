@@ -3,8 +3,8 @@
 A square, step-by-step explainer showing how a water-cooled air conditioning system works. Its key message: **building water never travels to the wall unit; only refrigerant does.**
 
 There are five captioned steps:
-- The water zone always stops inside the condenser unit.
-- The "Refrigerant only, no water piped in" badge points at the pipe pair where it crosses the wall, in every step.
+- The grey dashed water zone always stops inside the condenser unit.
+- The "Refrigerant only, no water piped in" badge points at the two refrigerant lines where they cross the wall, in every step.
 
 Files:
 - `WaterCooledACAnimation.tsx`: client component (`"use client"`, default export, no dependencies)
@@ -51,7 +51,15 @@ export default function Page() {
 | `eyebrow` | `string` | — | Optional small heading inside the square, e.g. "How it works". |
 | `headline` | `string` | — | Optional headline inside the square. It takes space from the diagram, so prefer a page heading outside the component. |
 
-## Brand colours
+## Visual language and brand colours
+
+The illustration is simple line art. Equipment is drawn in black and the building context (room, wall, cupboard, drain, water zone) in greys. Colour is used **only for the three flows**, each drawn as one line with arrowheads and travelling beads:
+
+| Flow | Token | Default | Used for |
+|---|---|---|---|
+| Heat (red) | `--uc-heat` | `#e8412f` | hot refrigerant from the compressor to the heat exchanger, heat marks in the heat exchanger, warm room air, heat going to the rooftop coolers |
+| Cool (light blue) | `--uc-cool` | `#4fb3f0` | all other refrigerant (the two thin lines through the wall) and cool air from the wall unit |
+| Building water (mid blue, thicker) | `--uc-water` | `#1857ba` | the building loop flow and return, and the taps into the heat exchanger |
 
 All tokens are public `--uc-*` custom properties, listed with their defaults at the top of `WaterCooledACAnimation.module.css`. Set any of them in any of these places:
 - on the component, via `className`
@@ -61,8 +69,8 @@ All tokens are public `--uc-*` custom properties, listed with their defaults at 
 ```css
 /* any stylesheet: global, a CSS Module, or inline on a wrapper */
 .brand {
-  --uc-primary: #003a70;
-  --uc-accent: #00a37a;
+  --uc-heat: #d7262b;
+  --uc-water: #0f4fa8;
 }
 ```
 
@@ -74,14 +82,16 @@ Internally the component reads private `--_uc-*` copies whose fallbacks are the 
 
 | Group | Tokens |
 |---|---|
-| Surfaces and text | `--uc-bg`, `--uc-surface`, `--uc-ink`, `--uc-muted`, `--uc-primary`, `--uc-accent`, `--uc-focus`, `--uc-font`, `--uc-max-width` |
-| Refrigerant | `--uc-refrigerant-cold`, `--uc-refrigerant-cool`, `--uc-refrigerant-warm`, `--uc-refrigerant-hot` |
-| Water, heat and air | `--uc-water-flow`, `--uc-water-return`, `--uc-heat`, `--uc-air-cool` |
-| Illustration | `--uc-pipe-copper`, `--uc-pipe-core`, `--uc-pipe-water-edge`, `--uc-pipe-water-core`, `--uc-drain`, `--uc-drain-text`, `--uc-wall`, `--uc-wall-hatch`, `--uc-slab`, `--uc-room`, `--uc-plant`, `--uc-furniture`, `--uc-compressor`, `--uc-dim` |
+| Neutrals | `--uc-bg`, `--uc-ink` (near-black), `--uc-grey-1` (dark grey: body text, secondary labels), `--uc-grey-2` (mid grey: context lines, water-zone outline), `--uc-grey-3` (light grey: drain, plates, borders), `--uc-focus`, `--uc-font`, `--uc-max-width` |
+| Flows | `--uc-heat`, `--uc-cool`, `--uc-water` |
+| Other | `--uc-dim` (opacity of parts not in the current step) |
 
-Contrast rules:
-- Keep `--uc-primary`, `--uc-ink` and `--uc-focus` at **4.5:1 or more** against white, because they carry white text and focus rings.
-- Keep the refrigerant, air and heat colours at **3:1 or more** against `--uc-room` and `--uc-pipe-core`.
+Choosing replacement flow colours:
+- **Keep the three flows different in lightness, not just hue.** Water should be darkest, heat in the middle and cool lightest, so they stay distinct in greyscale and for red-green colour blindness.
+  - The defaults have relative luminance of about 0.11, 0.21 and 0.40, roughly a 1.7:1 step between each pair.
+  - A pure red and a mid blue of the same lightness, such as `#e0322b` and `#1f6fd1`, are almost identical in greyscale (1.1:1).
+- **The light blue is below 3:1 on white** (`#4fb3f0` is 2.3:1). This keeps the client's light-blue look. The cool lines are never the only cue: they always have arrowheads, the legend, labels and captions. If stricter graphic contrast is needed, darken `--uc-cool` towards `#2f9ae0` (about 3:1), keeping it clearly lighter than `--uc-water`.
+- Keep `--uc-ink` and `--uc-focus` at **4.5:1 or more** against `--uc-bg`. The active step, the callouts and the loud badge use white text on `--uc-ink`.
 
 ## Editing the copy
 
@@ -109,7 +119,7 @@ Length limits:
 
 **Automatic pausing**
 - Autoplay pauses while the tab is hidden, while the component is off-screen, and while a keyboard user is in the controls.
-- Only the parts lit in the current step move.
+- Only the parts lit in the current step move. Everything else, line art and flows alike, is dimmed.
 
 **Reduced motion:** with `prefers-reduced-motion: reduce` there is no autoplay and no motion. Static arrows on every pipe still show direction, and manual stepping works.
 
@@ -120,10 +130,9 @@ Length limits:
 - The active step button has `aria-current="step"`.
 
 **Not colour alone**
-- Water is a wide pipe with a double outline and round bubbles.
-- Refrigerant is a slim copper pipe, and the gas pipe is visibly larger than the liquid pipe.
-- Each refrigerant temperature has its own dash rhythm, matched in the legend: cold is short ticks, heat-carrying gas is short dashes, warm is long dashes, and hot is near-solid.
-- Every pipe carries direction arrowheads.
+- The three flows differ in lightness (see above), and water is also drawn thicker.
+- Every flow line carries direction arrowheads, and the legend shows the three line samples.
+- Heat appears only inside the condenser unit and in the room air.
 
 **Forced colours:** the diagram keeps its palette, and the active step uses the system `Highlight` colour.
 
