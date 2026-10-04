@@ -8,9 +8,12 @@ There are five captioned steps:
 - Condensate from the wall unit is shown as a thin grey line, pumped back to the condenser unit alongside the refrigerant lines. It runs away from the room, so "no water piped in" stays accurate.
 - Building water is shown simply as **Water in** (bottom of the heat exchanger) and **Water out** (top, warmer), so the heat exchanger works in counterflow.
 
-Files:
-- `WaterCooledACAnimation.tsx`: client component (`"use client"`, default export, no dependencies)
-- `WaterCooledACAnimation.module.css`: styles and brand tokens
+Files (copy the whole folder; only the default export is public):
+- `WaterCooledACAnimation.tsx`: client component (`"use client"`, default export, no dependencies). It holds the copy (`STEPS`, `LABELS`), the step logic, the controls and the accessibility.
+- `WaterCooledACAnimation.flat.tsx`: the flat (elevation) drawing.
+- `WaterCooledACAnimation.iso.tsx`: the isometric cut-away drawing.
+- `WaterCooledACAnimation.kit.tsx`: shared types and drawing parts (flow lines, arrows, valves, labels).
+- `WaterCooledACAnimation.module.css`: styles and brand tokens.
 
 ## Use it in a Next.js (App Router) page
 
@@ -35,7 +38,7 @@ export default function Page() {
 **Sizing**
 - The component is `width: 100%` with `aspect-ratio: 1 / 1`, so the **parent sets the size**. The caption and controls sit inside the square.
 - It is designed for **320–760px wide**, and is capped at 760px by default. Override the cap with `--uc-max-width`.
-- On phones it fills the width, and diagram labels render at about 11px at 340px wide.
+- On phones it fills the width, and diagram labels render at about 11px or more at 340px wide in both variants (flat 11.6px, isometric 11.2px).
 
 **Rendering**
 - It works from a Server Component page and renders on the server.
@@ -52,6 +55,23 @@ export default function Page() {
 | `stepDuration` | `number` | `7000` | Milliseconds per step (minimum 1500). The summary step is held for twice as long. |
 | `eyebrow` | `string` | — | Optional small heading inside the square, e.g. "How it works". |
 | `headline` | `string` | — | Optional headline inside the square. It takes space from the diagram, so prefer a page heading outside the component. |
+| `variant` | `"flat" \| "isometric"` | `"flat"` | Drawing style. Both variants use the same steps, captions, labels, controls, timing and accessibility; only the illustration changes. |
+
+### Variants
+
+```tsx
+<WaterCooledACAnimation />                      {/* flat elevation (default) */}
+<WaterCooledACAnimation variant="isometric" />  {/* isometric cut-away */}
+```
+
+- **Flat:** a straight-on section through the room, the wall and the cupboard. It is the most compact, and its labels are the largest on phones.
+- **Isometric:** a 3D cut-away slice of the flat, in true isometric projection.
+  - The room's floor and back wall, with the wall unit high on the wall.
+  - The partition wall the pipes pass through.
+  - The condenser unit with its front and top cut away, showing the compressor, heat exchanger and expansion valve.
+  - Water in and water out leaving the cupboard.
+
+  Labels stay upright for legibility. The geometry is built from a single `iso(x, y, z)` helper in `WaterCooledACAnimation.iso.tsx`, so it is easy to adjust.
 
 ## Visual language and brand colours
 

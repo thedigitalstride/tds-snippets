@@ -411,7 +411,7 @@
 @container (min-width: 480px) {
   .stage {
     flex: 0 1 auto;
-    aspect-ratio: 760 / 516;
+    aspect-ratio: var(--_uc-ratio, 760 / 516); /* the drawing's viewBox, set inline */
   }
   .band {
     flex: 1 1 auto;
@@ -620,6 +620,95 @@
   }
   .progress {
     display: none;
+  }
+}
+
+/* ======================================================= Isometric variant */
+/* Same line-art language; text stays upright. Labels are a little larger in
+   viewBox units because this drawing is taller (still about 11px at 340px). */
+.isoFloor {
+  fill: var(--_uc-grey-3);
+  fill-opacity: 0.3;
+  stroke: none;
+}
+.isoWall {
+  fill: var(--_uc-bg);
+  stroke: none;
+}
+.isoWallCut {
+  fill: var(--_uc-grey-3);
+  fill-opacity: 0.55;
+  stroke: var(--_uc-grey-2);
+  stroke-width: 1.75;
+  stroke-linejoin: round;
+}
+.isoWallSide {
+  fill: var(--_uc-bg);
+  stroke: var(--_uc-grey-2);
+  stroke-width: 1.75;
+  stroke-linejoin: round;
+}
+.isoLeaderGrey {
+  fill: none;
+  stroke: var(--_uc-grey-2);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
+.zoneFloor {
+  fill: var(--_uc-grey-3);
+  fill-opacity: 0.45;
+  stroke: var(--_uc-grey-2);
+  stroke-width: 2;
+  stroke-dasharray: 9 7;
+  stroke-linejoin: round;
+}
+.zoneEdges {
+  fill: none;
+  stroke: var(--_uc-grey-2);
+  stroke-width: 2;
+  stroke-dasharray: 9 7;
+  stroke-linejoin: round;
+}
+.zoneIso[data-emphasis="true"] .zoneFloor,
+.zoneIso[data-emphasis="true"] .zoneEdges {
+  stroke: var(--_uc-grey-1);
+  animation: zoneMarch 1400ms linear infinite;
+}
+
+.root[data-variant="isometric"] .areaLabel,
+.root[data-variant="isometric"] .componentLabel,
+.root[data-variant="isometric"] .unitLabel,
+.root[data-variant="isometric"] .legendText,
+.root[data-variant="isometric"] .noteLabel,
+.root[data-variant="isometric"] .waterLabel,
+.root[data-variant="isometric"] .zoneTagText,
+.root[data-variant="isometric"] .calloutText,
+.root[data-variant="isometric"] .badgeTitleQuiet,
+.root[data-variant="isometric"] .badgeTextQuiet,
+.root[data-variant="isometric"] .badgeTitleLoud,
+.root[data-variant="isometric"] .badgeTextLoud {
+  font-size: 29px;
+}
+@container (min-width: 480px) {
+  .root[data-variant="isometric"] .areaLabel {
+    font-size: 21px;
+  }
+  .root[data-variant="isometric"] .legendText,
+  .root[data-variant="isometric"] .noteLabel {
+    font-size: 21px;
+  }
+  .root[data-variant="isometric"] .waterLabel,
+  .root[data-variant="isometric"] .zoneTagText,
+  .root[data-variant="isometric"] .calloutText {
+    font-size: 23px;
+  }
+  .root[data-variant="isometric"] .componentLabel,
+  .root[data-variant="isometric"] .unitLabel,
+  .root[data-variant="isometric"] .badgeTitleQuiet,
+  .root[data-variant="isometric"] .badgeTextQuiet,
+  .root[data-variant="isometric"] .badgeTitleLoud,
+  .root[data-variant="isometric"] .badgeTextLoud {
+    font-size: 25px;
   }
 }
 
