@@ -12,11 +12,13 @@ import {
 import styles from "./WaterCooledACAnimation.module.css";
 
 /* -------------------------------------------------------------------------- */
-/*  Story                                                                     */
+/*  COPY — every user-facing string lives here. Swap freely.                  */
+/*  SVG labels are drawn at 26 viewBox units; keep them short (they must      */
+/*  still fit at ~340px wide). Captions: aim for 15–20 words.                 */
 /* -------------------------------------------------------------------------- */
 
 /** Parts of the illustration that can be lit (active) or dimmed per step. */
-type Part =
+export type Part =
   | "air"
   | "unit"
   | "coil"
@@ -28,13 +30,44 @@ type Part =
   | "water";
 
 /** Component that gets the pulsing highlight ring in a step. */
-type Focus = "unit" | "wall" | "compressor" | "hx" | "badge";
+export type Focus = "unit" | "wall" | "compressor" | "hx" | "badge";
 
-interface Step {
+export interface Step {
+  /** Short bold lead-in shown before the caption, and used in button labels. */
   title: string;
+  /** One or two sentences, ~15–20 words. */
   caption: string;
+  /** Which component gets the highlight ring. */
   focus: Focus;
+  /** Which parts stay lit and animated; everything else is dimmed. */
   active: readonly Part[];
+  /** Show the numbered marker (1–4) on the illustration for this step. */
+  marker: boolean;
+}
+
+export interface Labels {
+  room: string;
+  cupboard: string;
+  wallUnit: string;
+  condenser: string;
+  waterZone: string;
+  badgeQuiet: string;
+  badgeLoudTitle: string;
+  badgeLoudText: string;
+  legendRefrigerant: string;
+  legendWater: string;
+  legendLoop: string;
+  /** Accessible copy */
+  figureHeading: string;
+  svgTitle: string;
+  longDescription: string;
+  controlsGroup: string;
+  play: string;
+  pause: string;
+  previous: string;
+  next: string;
+  /** e.g. "Step 2 of 5: Through the wall" */
+  stepLabel: (n: number, total: number, title: string) => string;
 }
 
 const ALL_PARTS: readonly Part[] = [
@@ -49,13 +82,14 @@ const ALL_PARTS: readonly Part[] = [
   "water",
 ];
 
-const STEPS: readonly Step[] = [
+export const STEPS: readonly Step[] = [
   {
     title: "Cooling your room",
     caption:
       "The wall unit draws in warm air. Cold refrigerant in its coil soaks up the heat, and cool air flows back out.",
     focus: "unit",
     active: ["air", "unit", "coil"],
+    marker: true,
   },
   {
     title: "Through the wall",
@@ -63,6 +97,7 @@ const STEPS: readonly Step[] = [
       "The warmed refrigerant travels as a gas through slim insulated pipes to the condenser. Only refrigerant crosses the wall.",
     focus: "wall",
     active: ["gas", "liquid"],
+    marker: true,
   },
   {
     title: "Compressor",
@@ -70,6 +105,7 @@ const STEPS: readonly Step[] = [
       "The compressor squeezes the refrigerant gas, raising its temperature so the heat can be released.",
     focus: "compressor",
     active: ["compressor", "discharge"],
+    marker: true,
   },
   {
     title: "Heat exchanger",
@@ -77,6 +113,7 @@ const STEPS: readonly Step[] = [
       "Water from the building loop absorbs the heat and carries it away. The refrigerant cools to a liquid and returns.",
     focus: "hx",
     active: ["hx", "water", "liquid"],
+    marker: true,
   },
   {
     title: "No water in your room",
@@ -84,16 +121,38 @@ const STEPS: readonly Step[] = [
       "Water stays in the condenser and the building loop. Only refrigerant ever reaches your wall unit.",
     focus: "badge",
     active: ALL_PARTS,
+    marker: false,
   },
 ];
 
-const LONG_DESCRIPTION =
-  "Cut-away diagram of a flat. On the left, a room with an air conditioning wall unit high on the wall. " +
-  "Two slim refrigerant pipes run from the wall unit through the wall to a condenser unit in a cupboard. " +
-  "Inside the condenser, a compressor squeezes the refrigerant and a plate heat exchanger passes its heat " +
-  "to water from the building's water loop, which runs up and down the building on the right. " +
-  "A dashed water zone covers only the heat exchanger and the building loop: water never travels to the wall unit, " +
-  "only refrigerant does.";
+export const LABELS: Labels = {
+  room: "Your room",
+  cupboard: "Cupboard",
+  wallUnit: "Wall unit",
+  condenser: "Condenser",
+  waterZone: "Water zone",
+  badgeQuiet: "No water here",
+  badgeLoudTitle: "No water here",
+  badgeLoudText: "Refrigerant only",
+  legendRefrigerant: "Refrigerant",
+  legendWater: "Water",
+  legendLoop: "Building water loop",
+  figureHeading: "How a water-cooled air conditioning system works",
+  svgTitle: "Water-cooled air conditioning: water never reaches the wall unit",
+  longDescription:
+    "Cut-away diagram of a flat. On the left, a room with an air conditioning wall unit high on the wall. " +
+    "Two slim refrigerant pipes run from the wall unit through the wall to a condenser unit in a cupboard. " +
+    "Inside the condenser, a compressor squeezes the refrigerant and a plate heat exchanger passes its heat " +
+    "to water from the building's water loop, which runs up and down the building on the right. " +
+    "A dashed water zone covers only the heat exchanger and the building loop: water never travels to the wall unit, " +
+    "only refrigerant does.",
+  controlsGroup: "Animation controls",
+  play: "Play animation",
+  pause: "Pause animation",
+  previous: "Previous step",
+  next: "Next step",
+  stepLabel: (n, total, title) => `Step ${n} of ${total}: ${title}`,
+};
 
 /* -------------------------------------------------------------------------- */
 /*  Geometry (viewBox 0 0 800 560)                                            */
@@ -119,6 +178,14 @@ const PATHS = {
   /** Region where water exists. Ends inside the condenser at x = 500. */
   zone: "M 500 196 H 682 V 6 H 794 V 514 H 682 V 448 H 500 Z",
 } as const;
+
+/** Numbered markers tie the step pills to places on the drawing (step n → marker n). */
+const MARKER_POSITIONS = [
+  { n: 1, x: 66, y: 120 }, // wall unit
+  { n: 2, x: 318, y: 190 }, // wall crossing
+  { n: 3, x: 426, y: 362 }, // compressor
+  { n: 4, x: 562, y: 236 }, // heat exchanger
+] as const;
 
 type Dir = "up" | "down" | "left" | "right";
 const ANGLE: Record<Dir, number> = { right: 0, down: 90, left: 180, up: 270 };
@@ -318,9 +385,9 @@ export default function WaterCooledACAnimation({
       style={{ "--uc-step-duration": `${stepDuration}ms` } as CSSProperties}
     >
       <figcaption id={ids.heading} className={styles.srOnly}>
-        How a water-cooled air conditioning system works
+        {LABELS.figureHeading}
       </figcaption>
-      <p className={styles.srOnly}>{LONG_DESCRIPTION}</p>
+      <p className={styles.srOnly}>{LABELS.longDescription}</p>
 
       <div className={styles.stage}>
         <svg
@@ -332,8 +399,8 @@ export default function WaterCooledACAnimation({
           aria-describedby={ids.desc}
           focusable="false"
         >
-          <title id={ids.title}>Water-cooled air conditioning: water never reaches the wall unit</title>
-          <desc id={ids.desc}>{LONG_DESCRIPTION}</desc>
+          <title id={ids.title}>{LABELS.svgTitle}</title>
+          <desc id={ids.desc}>{LABELS.longDescription}</desc>
 
           <defs>
             <pattern id={ids.hatch} width="14" height="14" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
@@ -362,8 +429,8 @@ export default function WaterCooledACAnimation({
           <rect x="0" y="0" width="800" height="20" className={styles.slab} />
           <rect x="0" y="490" width="800" height="22" className={styles.slab} />
 
-          <text x="16" y="54" className={styles.areaLabel}>Your room</text>
-          <text x="348" y="58" className={styles.areaLabel}>Cupboard</text>
+          <text x="16" y="54" className={styles.areaLabel}>{LABELS.room}</text>
+          <text x="348" y="58" className={styles.areaLabel}>{LABELS.cupboard}</text>
 
           {/* Sofa silhouette */}
           <g className={styles.furniture} aria-hidden="true">
@@ -460,12 +527,12 @@ export default function WaterCooledACAnimation({
             </g>
           </g>
 
-          <text x="504" y="474" textAnchor="middle" className={styles.componentLabel}>Condenser</text>
+          <text x="504" y="474" textAnchor="middle" className={styles.componentLabel}>{LABELS.condenser}</text>
 
           {/* Water-zone tag straddles the zone's top edge. */}
           <g className={styles.zoneTag} data-emphasis={step >= 3 ? "true" : "false"}>
             <rect x="504" y="177" width="172" height="38" rx="19" className={styles.zoneTagBg} />
-            <text x="590" y="205" textAnchor="middle" className={styles.zoneTagText}>Water zone</text>
+            <text x="590" y="205" textAnchor="middle" className={styles.zoneTagText}>{LABELS.waterZone}</text>
           </g>
 
           {/* ---------------- Room: wall unit and air ---------------- */}
@@ -492,7 +559,7 @@ export default function WaterCooledACAnimation({
             <rect x="90" y="60" width="204" height="120" rx="24" className={styles.halo} data-on={focusOn("unit")} />
             <rect x="100" y="70" width="184" height="100" rx="16" className={styles.unit} filter={`url(#${ids.shadow})`} />
             <line x1="114" y1="162" x2="270" y2="162" className={styles.louvre} />
-            <text x="192" y="106" textAnchor="middle" className={styles.componentLabel}>Wall unit</text>
+            <text x="192" y="106" textAnchor="middle" className={styles.componentLabel}>{LABELS.wallUnit}</text>
           </g>
           <g className={styles.part} {...part("coil")}>
             <RefPipe d={PATHS.coilCold} hot={false} />
@@ -505,23 +572,18 @@ export default function WaterCooledACAnimation({
             <g className={styles.badgeQuiet}>
               <rect x="-130" y="-22" width="260" height="44" rx="22" className={styles.badgeQuietBg} />
               <NoWaterIcon x={-104} y={0} s={0.95} />
-              <text x="-84" y="9" className={styles.badgeQuietText}>No water here</text>
+              <text x="-84" y="9" className={styles.badgeQuietText}>{LABELS.badgeQuiet}</text>
             </g>
             <g className={styles.badgeLoud}>
               <rect x="-134" y="-40" width="268" height="80" rx="20" className={styles.badgeLoudBg} />
               <NoWaterIcon x={-108} y={-12} s={0.95} />
-              <text x="-86" y="-3" className={styles.badgeLoudTitle}>No water here</text>
-              <text x="0" y="28" textAnchor="middle" className={styles.badgeLoudText}>Refrigerant only</text>
+              <text x="-86" y="-3" className={styles.badgeLoudTitle}>{LABELS.badgeLoudTitle}</text>
+              <text x="0" y="28" textAnchor="middle" className={styles.badgeLoudText}>{LABELS.badgeLoudText}</text>
             </g>
           </g>
 
           {/* ---------------- Step markers ---------------- */}
-          {[
-            { n: 1, x: 66, y: 120 },
-            { n: 2, x: 318, y: 190 },
-            { n: 3, x: 426, y: 362 },
-            { n: 4, x: 562, y: 236 },
-          ].map((m) => (
+          {MARKER_POSITIONS.filter((m) => STEPS[m.n - 1]?.marker).map((m) => (
             <g key={m.n} className={styles.marker} data-on={marker(m.n)} transform={`translate(${m.x} ${m.y})`}>
               <circle r="19" className={styles.markerDisc} />
               <text y="9" textAnchor="middle" className={styles.markerText}>{m.n}</text>
@@ -537,14 +599,14 @@ export default function WaterCooledACAnimation({
               <path d="M 22 537 H 38" className={styles.legendDashHot} />
               <path d="M 44 537 H 58" className={styles.legendDashCold} />
             </g>
-            <text x="72" y="546" className={styles.legendText}>Refrigerant</text>
+            <text x="72" y="546" className={styles.legendText}>{LABELS.legendRefrigerant}</text>
             <g>
               <path d="M 262 537 H 312" className={styles.waterOuter} />
               <path d="M 262 537 H 312" className={styles.waterCore} />
               <path d="M 274 537 H 300" className={styles.legendDots} />
             </g>
-            <text x="324" y="546" className={styles.legendText}>Water</text>
-            <text x="792" y="546" textAnchor="end" className={styles.legendText}>Building water loop</text>
+            <text x="324" y="546" className={styles.legendText}>{LABELS.legendWater}</text>
+            <text x="792" y="546" textAnchor="end" className={styles.legendText}>{LABELS.legendLoop}</text>
           </g>
         </svg>
       </div>
@@ -552,7 +614,7 @@ export default function WaterCooledACAnimation({
       {/* ---------------- Caption + controls ---------------- */}
       <div className={styles.band}>
         <p className={styles.srOnly} aria-live={playing ? "off" : "polite"} aria-atomic="true">
-          {`Step ${step + 1} of ${STEPS.length}: ${current.title}. ${current.caption}`}
+          {`${LABELS.stepLabel(step + 1, STEPS.length, current.title)}. ${current.caption}`}
         </p>
         <div className={styles.captionStack} aria-hidden="true">
           {STEPS.map((s, i) => (
@@ -566,7 +628,7 @@ export default function WaterCooledACAnimation({
           ref={controlsRef}
           className={styles.controls}
           role="group"
-          aria-label="Animation controls"
+          aria-label={LABELS.controlsGroup}
           onFocus={onControlsFocus}
           onBlur={onControlsBlur}
         >
@@ -574,7 +636,7 @@ export default function WaterCooledACAnimation({
             type="button"
             className={`${styles.btn} ${styles.btnPlay}`}
             onClick={() => setPlaying((p) => !p)}
-            aria-label={playing ? "Pause animation" : "Play animation"}
+            aria-label={playing ? LABELS.pause : LABELS.play}
           >
             {playing ? (
               <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
@@ -592,7 +654,7 @@ export default function WaterCooledACAnimation({
             type="button"
             className={styles.btn}
             onClick={() => goTo(step - 1)}
-            aria-label="Previous step"
+            aria-label={LABELS.previous}
           >
             <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
               <path d="M 12.5 4 L 6.5 10 L 12.5 16" className={styles.iconStroke} />
@@ -607,7 +669,7 @@ export default function WaterCooledACAnimation({
                   className={styles.pill}
                   data-on={i === step ? "true" : "false"}
                   aria-current={i === step ? "step" : undefined}
-                  aria-label={`Step ${i + 1} of ${STEPS.length}: ${s.title}`}
+                  aria-label={LABELS.stepLabel(i + 1, STEPS.length, s.title)}
                   onClick={() => goTo(i)}
                 >
                   <span aria-hidden="true">{i + 1}</span>
@@ -621,7 +683,7 @@ export default function WaterCooledACAnimation({
             type="button"
             className={styles.btn}
             onClick={() => goTo(step + 1)}
-            aria-label="Next step"
+            aria-label={LABELS.next}
           >
             <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
               <path d="M 7.5 4 L 13.5 10 L 7.5 16" className={styles.iconStroke} />
