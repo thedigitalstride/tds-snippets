@@ -4,9 +4,9 @@ import {
   useCallback,
   useEffect,
   useId,
-  useLayoutEffect,
   useRef,
   useState,
+  useSyncExternalStore,
   type CSSProperties,
   type FocusEvent,
 } from "react";
@@ -14,8 +14,8 @@ import styles from "./WaterCooledACAnimation.module.css";
 
 /* ========================================================================== */
 /*  COPY: every user-facing string lives in STEPS and LABELS below.            */
-/*  SVG labels are drawn at 26 viewBox units (about 11px on a 340px-wide       */
-/*  phone), so keep them short. Captions: 18 words or fewer.                   */
+/*  On phones, SVG labels render at about 11px (26 viewBox units), so keep     */
+/*  them short. Captions: 18 words or fewer (3 lines at 320px wide).           */
 /* ========================================================================== */
 
 /** Parts of the illustration that are lit (and animated) or dimmed per step. */
@@ -30,21 +30,27 @@ export type Part =
   | "warmLiquid" //   warm liquid: heat exchanger → expansion valve
   | "valve" //        expansion valve
   | "liquid" //       cold liquid pipe (smaller): expansion valve → wall unit
-  | "water" //        building water loop, taps and isolation valves
-  | "drain"; //       condensate drain
+  | "water"; //       building water loop, taps, isolation valves, roof note
 
-/** Things that can wear the pulsing highlight ring. */
-export type Focus = "unit" | "wall" | "compressor" | "hx" | "valve" | "badge";
+/** Things that can wear the pulsing highlight ring (one per step). */
+export type Focus = "unit" | "wall" | "compressor" | "hx" | "badge";
+
+/** Optional on-diagram callout shown under the condenser unit for a step. */
+export type Callout = "compressor" | "heatExchanger";
 
 export interface Step {
   /** Bold lead-in before the caption; also used in the step button labels. */
   title: string;
   /** 18 words or fewer. */
   caption: string;
-  /** Components that get the highlight ring. */
-  focus: readonly Focus[];
-  /** Parts that stay lit and animated; everything else is dimmed. */
+  /** Component that gets the highlight ring. */
+  focus: Focus;
+  /** Parts that stay lit and animated; everything else is dimmed and still. */
   active: readonly Part[];
+  /** Name a component on the drawing during this step. */
+  callout?: Callout;
+  /** Multiplies stepDuration for this step (the summary is held longer). */
+  hold?: number;
 }
 
 export interface Labels {
@@ -53,17 +59,18 @@ export interface Labels {
   wallUnit: string;
   condenserUnit: string;
   waterZone: string;
+  waterIn: string;
+  waterOut: string;
+  callouts: Record<Callout, string>;
   condensateDrain: readonly string[]; // one entry per line
   toRoof: readonly string[]; //         one entry per line
-  loop: readonly string[]; //           one entry per line
   badge: readonly [string, string]; //  [bold line, second line]
   legendCold: string;
+  legendCool: string;
   legendHot: string;
   legendWater: string;
   /** Hover tooltips on parts that are not labelled on the drawing. */
   tooltips: {
-    compressor: string;
-    heatExchanger: string;
     expansionValve: string;
     isolationValve: string;
     gasPipe: string;
@@ -81,56 +88,44 @@ export interface Labels {
   announce: (n: number, total: number, title: string, caption: string) => string;
 }
 
-const ALL_PARTS: readonly Part[] = [
-  "air",
-  "unit",
-  "coil",
-  "suction",
-  "compressor",
-  "discharge",
-  "hx",
-  "warmLiquid",
-  "valve",
-  "liquid",
-  "water",
-  "drain",
-];
-
 export const STEPS: readonly Step[] = [
   {
     title: "Room heat is captured",
     caption:
       "The wall unit's cold refrigerant coil absorbs heat from your room air. Cool air flows back out.",
-    focus: ["unit"],
-    active: ["air", "unit", "coil", "drain"],
+    focus: "unit",
+    active: ["air", "unit", "coil"],
   },
   {
     title: "Refrigerant carries the heat",
     caption:
       "Refrigerant gas carries the heat through slim insulated pipes to the condenser unit. No water travels this way.",
-    focus: ["wall"],
+    focus: "wall",
     active: ["suction", "liquid"],
   },
   {
     title: "Compressor turns up the heat",
     caption:
       "The compressor squeezes the gas, raising its temperature so it can pass its heat to the water.",
-    focus: ["compressor"],
+    focus: "compressor",
     active: ["suction", "compressor", "discharge"],
+    callout: "compressor",
   },
   {
     title: "Water takes the heat away",
     caption:
-      "In the heat exchanger, the building's water absorbs the heat. The refrigerant becomes liquid again and heads back.",
-    focus: ["hx", "valve"],
+      "The building's water absorbs the heat in the heat exchanger. Refrigerant turns back to liquid and returns.",
+    focus: "hx",
     active: ["discharge", "hx", "warmLiquid", "valve", "liquid", "water"],
+    callout: "heatExchanger",
   },
   {
     title: "Water stays in the cupboard",
     caption:
       "Building water goes no further than the condenser unit. Only refrigerant travels to your wall unit.",
-    focus: ["badge"],
-    active: ALL_PARTS,
+    focus: "badge",
+    active: ["air", "unit", "coil", "suction", "compressor", "discharge", "hx", "warmLiquid", "valve", "liquid", "water"],
+    hold: 2,
   },
 ];
 
@@ -140,16 +135,17 @@ export const LABELS: Labels = {
   wallUnit: "Wall unit",
   condenserUnit: "Condenser unit",
   waterZone: "Water zone",
+  waterIn: "Cooler in",
+  waterOut: "Warmer out",
+  callouts: { compressor: "Compressor", heatExchanger: "Heat exchanger" },
   condensateDrain: ["Condensate", "drain"],
   toRoof: ["To rooftop", "coolers"],
-  loop: ["Building", "water loop"],
   badge: ["Refrigerant only", "no water piped in"],
   legendCold: "Cold refrigerant",
+  legendCool: "Heat-carrying gas",
   legendHot: "Hot refrigerant",
-  legendWater: "Building water",
+  legendWater: "Building water loop",
   tooltips: {
-    compressor: "Compressor",
-    heatExchanger: "Heat exchanger",
     expansionValve: "Expansion valve",
     isolationValve: "Isolation valve",
     gasPipe: "Refrigerant gas (larger pipe)",
@@ -171,12 +167,13 @@ export const LABELS: Labels = {
 };
 
 /* ========================================================================== */
-/*  Geometry (viewBox 0 0 800 580)                                             */
+/*  Geometry (viewBox 0 0 800 548)                                             */
 /*  Refrigerant cycle: coil → gas pipe → compressor → heat exchanger →         */
 /*  expansion valve → liquid pipe → coil. Paths are drawn in flow direction.   */
 /* ========================================================================== */
 
-const VIEWBOX = "0 0 800 580";
+const VB_W = 800;
+const VB_H = 548;
 
 const PATHS = {
   /** Wall-unit coil: cold liquid enters along the bottom… */
@@ -184,84 +181,115 @@ const PATHS = {
   /** …turns, and leaves as cool, heat-carrying gas along the top. */
   coilOut: "M 122 146 A 10 10 0 0 1 122 126 H 284",
   /** Gas (suction) pipe, the larger one: wall unit → through wall → compressor. */
-  suction: "M 284 126 H 426 V 270",
+  suction: "M 284 126 H 404 V 272",
   /** Hot gas: compressor → top of the heat exchanger. */
-  discharge: "M 456 304 H 486 V 252 H 520",
+  discharge: "M 456 296 H 486 V 276 H 520",
   /** Warm liquid: bottom of the heat exchanger → expansion valve. */
-  warmLiquid: "M 540 402 V 416 H 470",
+  warmLiquid: "M 532 372 V 406 H 470",
   /** Cold liquid pipe, the smaller one: expansion valve → through wall → wall unit. */
-  liquid: "M 470 416 H 358 V 146 H 284",
+  liquid: "M 470 406 H 358 V 146 H 284",
   /** Building loop: flow comes down from the roof, return goes back up. */
-  flowRiser: "M 752 -2 V 506",
-  returnRiser: "M 708 506 V -2",
+  flowRiser: "M 752 -2 V 482",
+  returnRiser: "M 708 482 V -2",
   /** Counterflow: water enters the heat exchanger at the bottom, leaves at the top. */
-  flowTap: "M 752 380 H 604",
-  returnTap: "M 604 260 H 708",
-  /** Condensate drain: thin and grey, outside the water zone. */
-  drain: "M 270 170 V 182 Q 270 192 280 192 H 284 Q 292 192 292 200 V 486",
+  flowTap: "M 752 350 H 604",
+  returnTap: "M 604 276 H 708",
+  /** Condensate drain: thin and grey, outside the water zone, runs to waste. */
+  drain: "M 112 170 V 466",
+  /** Badge leader: from the badge to the pipe pair where it crosses the wall. */
+  leader: "M 256 258 L 298 164 V 108",
   /** Where water exists. It ends inside the condenser unit, at x = 500. */
-  zone: "M 500 196 H 682 V 6 H 798 V 504 H 682 V 448 H 500 Z",
+  zone: "M 500 188 H 682 V 6 H 798 V 480 H 682 V 428 H 500 Z",
 } as const;
+
+const CASING = { x: 380, y: 208, w: 248, h: 212, r: 18 } as const;
+
+/** Two-turn scroll (Archimedean spiral): the compressor's working part. */
+const SCROLL_PATH = (() => {
+  const cx = 426;
+  const cy = 300;
+  const turns = 2.25;
+  const pts: string[] = [];
+  for (let i = 0; i <= 72; i++) {
+    const t = (i / 72) * turns * 2 * Math.PI;
+    const r = 3 + (17 * t) / (turns * 2 * Math.PI);
+    pts.push(`${(cx + r * Math.cos(t)).toFixed(1)} ${(cy + r * Math.sin(t)).toFixed(1)}`);
+  }
+  return `M ${pts.join(" L ")}`;
+})();
 
 /** Numbered markers tie step n's button to a place on the drawing. */
 const MARKERS = [
   { n: 1, x: 66, y: 120 }, //  wall unit
-  { n: 2, x: 318, y: 252 }, // wall crossing
-  { n: 3, x: 426, y: 362 }, // compressor
-  { n: 4, x: 562, y: 236 }, // heat exchanger
+  { n: 2, x: 318, y: 192 }, // wall crossing
+  { n: 3, x: 426, y: 348 }, // compressor
+  { n: 4, x: 562, y: 318 }, // heat exchanger (between the heat squiggles)
 ] as const;
 
 type Dir = "up" | "down" | "left" | "right";
 const ANGLE: Record<Dir, number> = { right: 0, down: 90, left: 180, up: 270 };
 
-/** Refrigerant state, drawn as a colour convention: blue = cold, red = hot. */
+/** Refrigerant state, drawn as a colour convention (blue = cold, red = hot) plus its own dash rhythm. */
 type RefState = "cold" | "cool" | "hot" | "warm";
 type RefSize = "gas" | "liquid";
+type ClassName = string | undefined;
+
+const cx = (...c: (ClassName | false)[]) => c.filter(Boolean).join(" ");
+
+/** Safe step lookup (works with noUncheckedIndexedAccess). */
+const stepAt = (i: number): Step => STEPS[i] ?? (STEPS[0] as Step);
 
 /* ========================================================================== */
-/*  Hooks                                                                     */
+/*  External stores (no setState-in-effect, SSR-safe server snapshots)         */
 /* ========================================================================== */
 
-const useIsoLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
+const RM_QUERY = "(prefers-reduced-motion: reduce)";
+const subscribeReducedMotion = (cb: () => void) => {
+  if (typeof window === "undefined" || !window.matchMedia) return () => {};
+  const mq = window.matchMedia(RM_QUERY);
+  mq.addEventListener("change", cb);
+  return () => mq.removeEventListener("change", cb);
+};
+const getReducedMotion = () => typeof window !== "undefined" && !!window.matchMedia?.(RM_QUERY).matches;
 
-function usePrefersReducedMotion(): boolean {
-  const [reduced, setReduced] = useState(false);
-  useEffect(() => {
-    if (typeof window === "undefined" || !window.matchMedia) return;
-    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const update = () => setReduced(mq.matches);
-    update();
-    mq.addEventListener("change", update);
-    return () => mq.removeEventListener("change", update);
-  }, []);
-  return reduced;
-}
+const subscribeVisibility = (cb: () => void) => {
+  document.addEventListener("visibilitychange", cb);
+  return () => document.removeEventListener("visibilitychange", cb);
+};
+const getTabHidden = () => document.visibilityState === "hidden";
+
+const subscribeNothing = () => () => {};
+const getTrue = () => true;
+const getFalse = () => false;
 
 /* ========================================================================== */
 /*  SVG building blocks                                                       */
 /* ========================================================================== */
 
-const refFlowClass: Record<RefState, string> = {
+const refStateClass: Record<RefState, ClassName> = {
   cold: styles.refCold,
   cool: styles.refCool,
   hot: styles.refHot,
   warm: styles.refWarm,
 };
-const refArrowClass: Record<RefState, string> = {
+const refArrowClass: Record<RefState, ClassName> = {
   cold: styles.refArrowCold,
   cool: styles.refArrowCool,
   hot: styles.refArrowHot,
   warm: styles.refArrowWarm,
 };
 
-/** Copper-rimmed refrigerant pipe with dashes flowing inside. Gas pipe is larger. */
-function RefPipe({ d, state, size }: { d: string; state: RefState; size: RefSize }) {
+/** Copper-rimmed refrigerant pipe with dashes flowing inside. The gas pipe is larger. */
+function RefPipe({ d, state, size, still }: { d: string; state: RefState; size: RefSize; still?: boolean }) {
   const big = size === "gas";
   return (
     <>
       <path className={big ? styles.refRimGas : styles.refRimLiquid} d={d} />
       <path className={big ? styles.refCoreGas : styles.refCoreLiquid} d={d} />
-      <path className={`${styles.refFlow} ${big ? styles.refFlowGas : styles.refFlowLiquid} ${refFlowClass[state]}`} d={d} />
+      <path
+        className={cx(styles.refFlow, big ? styles.refFlowGas : styles.refFlowLiquid, refStateClass[state], still && styles.still)}
+        d={d}
+      />
     </>
   );
 }
@@ -278,40 +306,55 @@ function RefArrow({ x, y, dir, state, size }: { x: number; y: number; dir: Dir; 
 }
 
 /** Wide, double-outlined water pipe with round bubbles flowing inside. */
-function WaterPipe({ d, ret }: { d: string; ret?: boolean }) {
+function WaterPipe({ d, ret, still }: { d: string; ret?: boolean; still?: boolean }) {
   return (
     <>
       <path className={styles.waterRim} d={d} />
       <path className={styles.waterCore} d={d} />
-      <path className={`${styles.waterFlow} ${ret ? styles.waterReturn : styles.waterSupply}`} d={d} />
+      <path className={cx(styles.waterFlow, ret ? styles.waterReturn : styles.waterSupply, still && styles.still)} d={d} />
     </>
   );
 }
 
-function WaterArrow({ x, y, dir, ret }: { x: number; y: number; dir: Dir; ret?: boolean }) {
+function WaterArrow({ x, y, dir, ret, s = 1 }: { x: number; y: number; dir: Dir; ret?: boolean; s?: number }) {
   return (
     <path
       className={ret ? styles.waterArrowReturn : styles.waterArrow}
       d="M -6 -8 L 7 0 L -6 8 Z"
-      transform={`translate(${x} ${y}) rotate(${ANGLE[dir]})`}
+      transform={`translate(${x} ${y}) rotate(${ANGLE[dir]}) scale(${s})`}
     />
   );
 }
 
 /** Bow-tie valve symbol on a horizontal pipe. */
-function Valve({ x, y, r, className, title }: { x: number; y: number; r: number; className: string; title: string }) {
+function Valve({
+  x,
+  y,
+  r,
+  className,
+  title,
+  stemDown,
+}: {
+  x: number;
+  y: number;
+  r: number;
+  className?: ClassName;
+  title: string;
+  stemDown?: boolean;
+}) {
+  const s = stemDown ? 1 : -1;
   return (
     <g className={className} transform={`translate(${x} ${y})`}>
       <title>{title}</title>
       <path d={`M ${-r} ${-r} L 0 0 L ${-r} ${r} Z M ${r} ${-r} L 0 0 L ${r} ${r} Z`} />
-      <path d={`M 0 0 V ${-r - 5} M ${-r * 0.6} ${-r - 5} H ${r * 0.6}`} className={styles.valveStem} />
+      <path d={`M 0 0 V ${s * (r + 5)} M ${-r * 0.6} ${s * (r + 5)} H ${r * 0.6}`} className={styles.valveStem} />
     </g>
   );
 }
 
 interface PillLine {
   text: string;
-  className: string;
+  className?: ClassName;
   /** Baseline offset from the pill centre. */
   dy: number;
 }
@@ -321,7 +364,7 @@ interface PillLine {
  * can change freely. If the text is wider than `maxWidth` it is scaled to fit.
  */
 function Pill({
-  cx,
+  cx: centreX,
   cy,
   height,
   padX,
@@ -336,41 +379,41 @@ function Pill({
   padX: number;
   maxWidth: number;
   lines: readonly PillLine[];
-  bgClassName: string;
+  bgClassName?: ClassName;
   fallbackCharWidth?: number;
 }) {
   const textRef = useRef<SVGGElement>(null);
   const longest = Math.max(...lines.map((l) => l.text.length));
-  const [textWidth, setTextWidth] = useState(longest * fallbackCharWidth);
-  const key = lines.map((l) => l.text).join("|");
+  const [measured, setMeasured] = useState<number | null>(null);
+  const textWidth = measured ?? longest * fallbackCharWidth;
 
-  useIsoLayoutEffect(() => {
-    let cancelled = false;
+  // Re-measure whenever the text box changes size (copy, web fonts, container-query font sizes).
+  useEffect(() => {
+    const el = textRef.current;
+    if (!el) return;
     const measure = () => {
-      const el = textRef.current;
-      if (cancelled || !el) return;
       try {
         const w = el.getBBox().width;
-        if (w > 0) setTextWidth(w);
+        if (w > 0) setMeasured(w);
       } catch {
-        /* not rendered yet */
+        /* not rendered */
       }
     };
-    measure();
-    if (typeof document !== "undefined" && document.fonts?.ready) {
-      document.fonts.ready.then(measure).catch(() => undefined);
+    if (typeof ResizeObserver !== "undefined") {
+      const ro = new ResizeObserver(measure);
+      ro.observe(el);
+      return () => ro.disconnect();
     }
-    return () => {
-      cancelled = true;
-    };
-  }, [key]);
+    const raf = requestAnimationFrame(measure);
+    return () => cancelAnimationFrame(raf);
+  }, []);
 
   const scale = Math.min(1, (maxWidth - padX * 2) / textWidth);
   const width = Math.min(maxWidth, textWidth * scale + padX * 2);
   return (
     <>
-      <rect x={cx - width / 2} y={cy - height / 2} width={width} height={height} rx={Math.min(height / 2, 22)} className={bgClassName} />
-      <g transform={`translate(${cx} ${cy}) scale(${scale})`}>
+      <rect x={centreX - width / 2} y={cy - height / 2} width={width} height={height} rx={Math.min(height / 2, 22)} className={bgClassName} />
+      <g transform={`translate(${centreX} ${cy}) scale(${scale})`}>
         <g ref={textRef}>
           {lines.map((l) => (
             <text key={l.text} x={0} y={l.dy} textAnchor="middle" className={l.className}>
@@ -383,27 +426,32 @@ function Pill({
   );
 }
 
+/** Legend swatch for a refrigerant pipe: identical to the pipe it describes, but still. */
+function RefSwatch({ x, y, state, size }: { x: number; y: number; state: RefState; size: RefSize }) {
+  return <RefPipe d={`M ${x} ${y} H ${x + 46}`} state={state} size={size} still />;
+}
+
 /* ========================================================================== */
 /*  Component                                                                 */
 /* ========================================================================== */
 
 export interface WaterCooledACAnimationProps {
-  /** Extra class on the root element, e.g. to set a max-width. */
-  className?: string;
+  /** Extra class on the root element, e.g. to set brand tokens or margins. */
+  className?: string | undefined;
   /** Start auto-advancing on mount. Ignored when the viewer prefers reduced motion. */
-  autoPlay?: boolean;
-  /** How long each step shows while playing, in milliseconds. */
-  stepDuration?: number;
+  autoPlay?: boolean | undefined;
+  /** How long each step shows while playing, in ms (min 1500; the last step is held twice as long). */
+  stepDuration?: number | undefined;
   /** Optional small heading inside the square, e.g. "How it works". */
-  eyebrow?: string;
+  eyebrow?: string | undefined;
   /** Optional headline inside the square. Leave empty if the page already has one. */
-  headline?: string;
+  headline?: string | undefined;
 }
 
 export default function WaterCooledACAnimation({
   className,
   autoPlay = true,
-  stepDuration = 4500,
+  stepDuration = 7000,
   eyebrow,
   headline,
 }: WaterCooledACAnimationProps) {
@@ -422,50 +470,47 @@ export default function WaterCooledACAnimation({
     boxClip: `${uid}-box-clip`,
   };
 
+  const duration = Number.isFinite(stepDuration) ? Math.max(1500, stepDuration) : 7000;
+
   const rootRef = useRef<HTMLElement>(null);
   const controlsRef = useRef<HTMLDivElement>(null);
 
   const [step, setStep] = useState(0);
-  const [playing, setPlaying] = useState(autoPlay);
-  const [tabHidden, setTabHidden] = useState(false);
+  /** Increments on every manual navigation (restarts timers and re-announces). */
+  const [nav, setNav] = useState(0);
+  /** null = the viewer has not chosen; follow autoPlay and reduced motion. */
+  const [userPlaying, setUserPlaying] = useState<boolean | null>(null);
   const [inView, setInView] = useState(true);
   const [keyboardInControls, setKeyboardInControls] = useState(false);
-  /** Only user-initiated step changes are announced (not autoplay). */
   const [announcement, setAnnouncement] = useState("");
-  const reducedMotion = usePrefersReducedMotion();
 
-  // No autoplay for people who ask for reduced motion.
-  useEffect(() => {
-    if (reducedMotion) setPlaying(false);
-  }, [reducedMotion]);
+  const reducedMotion = useSyncExternalStore(subscribeReducedMotion, getReducedMotion, getFalse);
+  const tabHidden = useSyncExternalStore(subscribeVisibility, getTabHidden, getFalse);
+  const hydrated = useSyncExternalStore(subscribeNothing, getTrue, getFalse);
 
-  // Pause when the tab is hidden.
-  useEffect(() => {
-    const update = () => setTabHidden(document.visibilityState === "hidden");
-    update();
-    document.addEventListener("visibilitychange", update);
-    return () => document.removeEventListener("visibilitychange", update);
-  }, []);
+  const playing = userPlaying ?? (autoPlay && !reducedMotion);
+  /** Particles and pulses run while playing and visible. */
+  const moving = playing && !tabHidden && inView;
+  /** The step timer also needs hydration, and holds while a keyboard user is in the controls. */
+  const advancing = hydrated && moving && !keyboardInControls;
+
+  const current = stepAt(step);
+  const stepMs = Math.round(duration * (current.hold ?? 1));
 
   // Pause while scrolled out of view.
   useEffect(() => {
     const el = rootRef.current;
     if (!el || typeof IntersectionObserver === "undefined") return;
-    const io = new IntersectionObserver(([entry]) => setInView(entry.isIntersecting), { threshold: 0.15 });
+    const io = new IntersectionObserver(([entry]) => setInView(entry?.isIntersecting ?? true), { threshold: 0.15 });
     io.observe(el);
     return () => io.disconnect();
   }, []);
 
-  /** Particles and pulses run while playing and visible. */
-  const moving = playing && !tabHidden && inView;
-  /** The step timer also holds while a keyboard user is in the controls. */
-  const advancing = moving && !keyboardInControls;
-
   // Step timer. The time left is kept across pauses, so resuming continues the same step.
-  const remainingRef = useRef(stepDuration);
+  const remainingRef = useRef(stepMs);
   useEffect(() => {
-    remainingRef.current = stepDuration;
-  }, [step, stepDuration]);
+    remainingRef.current = stepMs;
+  }, [step, nav, stepMs]);
   useEffect(() => {
     if (!advancing) return;
     const startedAt = performance.now();
@@ -474,13 +519,15 @@ export default function WaterCooledACAnimation({
       window.clearTimeout(timer);
       remainingRef.current = Math.max(0, remainingRef.current - (performance.now() - startedAt));
     };
-  }, [advancing, step]);
+  }, [advancing, step, nav]);
 
-  /** User navigation: jump, restart that step's timer, and announce it. */
+  /** Manual navigation: jump, pause autoplay (the viewer is in control), and announce. */
   const goTo = useCallback((i: number) => {
     const n = ((i % STEPS.length) + STEPS.length) % STEPS.length;
-    const s = STEPS[n];
+    const s = stepAt(n);
     setStep(n);
+    setNav((k) => k + 1);
+    setUserPlaying(false);
     setAnnouncement(LABELS.announce(n + 1, STEPS.length, s.title, s.caption));
   }, []);
 
@@ -498,20 +545,20 @@ export default function WaterCooledACAnimation({
     if (!next || !controlsRef.current?.contains(next)) setKeyboardInControls(false);
   };
 
-  const current = STEPS[step];
   const part = (p: Part) => ({ "data-active": current.active.includes(p) ? "true" : "false" });
-  const ring = (f: Focus) => (current.focus.includes(f) ? "true" : "false");
-  const loud = current.focus.includes("badge");
+  const ring = (f: Focus) => (current.focus === f ? "true" : "false");
+  const on = (b: boolean) => (b ? "true" : "false");
+  const loud = current.focus === "badge";
 
   return (
     <figure
       ref={rootRef}
-      className={`${styles.root}${className ? ` ${className}` : ""}`}
+      className={cx(styles.root, className)}
       data-step={step + 1}
-      data-moving={moving ? "true" : "false"}
-      data-advancing={advancing ? "true" : "false"}
+      data-moving={on(moving)}
+      data-advancing={on(advancing)}
       aria-labelledby={ids.title}
-      style={{ "--uc-step-duration": `${stepDuration}ms` } as CSSProperties}
+      style={{ "--_uc-step-ms": `${stepMs}ms` } as CSSProperties}
     >
       {(eyebrow || headline) && (
         <header className={styles.head}>
@@ -523,7 +570,7 @@ export default function WaterCooledACAnimation({
       <div className={styles.stage}>
         <svg
           className={styles.svg}
-          viewBox={VIEWBOX}
+          viewBox={`0 0 ${VB_W} ${VB_H}`}
           preserveAspectRatio="xMidYMid meet"
           role="img"
           aria-labelledby={ids.title}
@@ -539,7 +586,7 @@ export default function WaterCooledACAnimation({
               <line x1="0" y1="0" x2="0" y2="14" className={styles.wallHatch} />
             </pattern>
             <clipPath id={ids.boxClip}>
-              <rect x="380" y="214" width="248" height="222" rx="18" />
+              <rect x={CASING.x} y={CASING.y} width={CASING.w} height={CASING.h} rx={CASING.r} />
             </clipPath>
             <filter id={ids.shadow} x="-20%" y="-20%" width="140%" height="150%">
               <feDropShadow dx="0" dy="4" stdDeviation="5" floodColor="#0b2340" floodOpacity="0.14" />
@@ -560,39 +607,43 @@ export default function WaterCooledACAnimation({
           </defs>
 
           {/* ---------------- Building section ---------------- */}
-          <rect x="0" y="0" width="800" height="580" className={styles.svgBg} />
-          <rect x="0" y="20" width="300" height="470" className={styles.roomFill} />
-          <rect x="336" y="20" width="464" height="470" className={styles.plantFill} />
-          <rect x="300" y="20" width="36" height="470" fill={`url(#${ids.hatch})`} />
-          <rect x="0" y="0" width="800" height="20" className={styles.slab} />
-          <rect x="0" y="490" width="800" height="16" className={styles.slab} />
+          <rect x="0" y="0" width={VB_W} height={VB_H} className={styles.svgBg} />
+          <rect x="0" y="20" width="300" height="446" className={styles.roomFill} />
+          <rect x="336" y="20" width="464" height="446" className={styles.plantFill} />
+          <rect x="300" y="20" width="36" height="446" fill={`url(#${ids.hatch})`} />
+          <rect x="0" y="0" width={VB_W} height="20" className={styles.slab} />
+          <rect x="0" y="466" width={VB_W} height="14" className={styles.slab} />
 
           <text x="16" y="54" className={styles.areaLabel}>{LABELS.room}</text>
-          <text x="348" y="100" className={styles.areaLabel}>{LABELS.cupboard}</text>
+          <text x="348" y="58" className={styles.areaLabel}>{LABELS.cupboard}</text>
 
-          {/* Sofa */}
-          <g className={styles.furniture} aria-hidden="true">
-            <rect x="26" y="404" width="112" height="46" rx="14" />
-            <rect x="16" y="438" width="132" height="32" rx="10" />
-            <rect x="6" y="422" width="30" height="54" rx="12" />
-            <rect x="128" y="422" width="30" height="54" rx="12" />
-            <rect x="20" y="474" width="9" height="16" rx="3" />
-            <rect x="135" y="474" width="9" height="16" rx="3" />
-          </g>
+          {/* ---------------- Water zone, outside the casing ---------------- */}
+          <path d={PATHS.zone} className={styles.zone} data-emphasis={on(step >= 3)} />
 
-          {/* ---------------- Water zone (always shown) ---------------- */}
-          <path d={PATHS.zone} className={styles.zone} data-emphasis={step >= 3 ? "true" : "false"} />
-
-          {/* ---------------- Condensate drain (grey, thin, not water-loop) ---------------- */}
-          <g className={styles.part} {...part("drain")}>
+          {/* ---------------- Condensate drain: secondary, never lit ---------------- */}
+          <g className={styles.drainGroup}>
             <path d={PATHS.drain} className={styles.drain} />
-            <path d="M 284 478 L 292 490 L 300 478" className={styles.drainEnd} />
+            <path d="M 104 454 L 112 466 L 120 454" className={styles.drain} />
             {LABELS.condensateDrain.map((line, i) => (
-              <text key={line} x="282" y={384 + i * 28} textAnchor="end" className={styles.drainLabel}>
+              <text key={line} x="124" y={374 + i * 26} className={styles.drainLabel}>
                 {line}
               </text>
             ))}
           </g>
+
+          {/* Sofa (drawn over the drain) */}
+          <g className={styles.furniture} aria-hidden="true">
+            <rect x="170" y="402" width="104" height="38" rx="12" />
+            <rect x="160" y="428" width="124" height="28" rx="9" />
+            <rect x="150" y="414" width="28" height="44" rx="11" />
+            <rect x="266" y="414" width="28" height="44" rx="11" />
+            <rect x="160" y="456" width="8" height="10" rx="3" />
+            <rect x="276" y="456" width="8" height="10" rx="3" />
+          </g>
+
+          {/* ---------------- Condenser casing (no fan, no grille) + water zone inside it ---------------- */}
+          <rect x={CASING.x} y={CASING.y} width={CASING.w} height={CASING.h} rx={CASING.r} className={styles.box} filter={`url(#${ids.shadow})`} />
+          <path d={PATHS.zone} className={styles.zone} clipPath={`url(#${ids.boxClip})`} data-emphasis={on(step >= 3)} />
 
           {/* ---------------- Building water loop ---------------- */}
           <g className={styles.part} {...part("water")}>
@@ -600,53 +651,44 @@ export default function WaterCooledACAnimation({
             <WaterPipe d={PATHS.flowRiser} />
             <WaterPipe d={PATHS.returnTap} ret />
             <WaterPipe d={PATHS.flowTap} />
-            <WaterArrow x={708} y={466} dir="up" ret />
-            <WaterArrow x={708} y={110} dir="up" ret />
-            <WaterArrow x={752} y={110} dir="down" />
-            <WaterArrow x={752} y={466} dir="down" />
-            <WaterArrow x={682} y={260} dir="right" ret />
-            <WaterArrow x={682} y={380} dir="left" />
-            <Valve x={648} y={260} r={11} className={styles.isoValve} title={LABELS.tooltips.isolationValve} />
-            <Valve x={648} y={380} r={11} className={styles.isoValve} title={LABELS.tooltips.isolationValve} />
-          </g>
-
-          {/* "To rooftop coolers", above the return riser */}
-          <g className={styles.roofNote}>
+            <WaterArrow x={708} y={150} dir="up" ret />
+            <WaterArrow x={708} y={440} dir="up" ret />
+            <WaterArrow x={752} y={150} dir="down" />
+            <WaterArrow x={752} y={440} dir="down" />
+            <WaterArrow x={682} y={276} dir="right" ret />
+            <WaterArrow x={682} y={350} dir="left" />
+            <Valve x={648} y={276} r={11} className={styles.isoValve} title={LABELS.tooltips.isolationValve} stemDown />
+            <Valve x={648} y={350} r={11} className={styles.isoValve} title={LABELS.tooltips.isolationValve} />
+            <text x="676" y="252" textAnchor="end" className={styles.tapLabel}>{LABELS.waterOut}</text>
+            <text x="676" y="398" textAnchor="end" className={styles.tapLabel}>{LABELS.waterIn}</text>
+            {/* To the rooftop coolers, from the top of the return riser */}
+            <WaterArrow x={708} y={34} dir="up" ret s={1.6} />
             {LABELS.toRoof.map((line, i) => (
-              <text key={line} x="650" y={50 + i * 30} textAnchor="end" className={styles.noteLabel}>
+              <text key={line} x="672" y={48 + i * 28} textAnchor="end" className={styles.noteLabel}>
                 {line}
               </text>
             ))}
-            <path d="M 666 74 V 34" className={styles.noteArrow} markerEnd={`url(#${ids.headWater})`} />
           </g>
 
-          {/* ---------------- Refrigerant pipes outside the units ---------------- */}
+          {/* ---------------- Refrigerant pipes (drawn over the casing so the loop is continuous) ---------------- */}
           <g className={styles.part} {...part("liquid")}>
             <title>{LABELS.tooltips.liquidPipe}</title>
             <RefPipe d={PATHS.liquid} state="cold" size="liquid" />
             <RefArrow x={358} y={300} dir="up" state="cold" size="liquid" />
-            <RefArrow x={420} y={416} dir="left" state="cold" size="liquid" />
+            <RefArrow x={430} y={406} dir="left" state="cold" size="liquid" />
           </g>
           <g className={styles.part} {...part("suction")}>
             <title>{LABELS.tooltips.gasPipe}</title>
             <path d={PATHS.suction} className={styles.glowCool} />
             <RefPipe d={PATHS.suction} state="cool" size="gas" />
-            <RefArrow x={386} y={126} dir="right" state="cool" size="gas" />
-            <RefArrow x={426} y={204} dir="down" state="cool" size="gas" />
+            <RefArrow x={380} y={126} dir="right" state="cool" size="gas" />
+            <RefArrow x={404} y={186} dir="down" state="cool" size="gas" />
           </g>
-
-          {/* Wall-crossing highlight */}
-          <rect x="290" y="104" width="56" height="64" rx="14" className={styles.halo} data-on={ring("wall")} />
-
-          {/* ---------------- Condenser unit (no fan, no grille) ---------------- */}
-          <rect x="380" y="214" width="248" height="222" rx="18" className={styles.box} filter={`url(#${ids.shadow})`} />
-          {/* The water zone continues inside the casing and stops at x = 500 */}
-          <path d={PATHS.zone} className={styles.zone} clipPath={`url(#${ids.boxClip})`} data-emphasis={step >= 3 ? "true" : "false"} />
 
           <g className={styles.part} {...part("discharge")}>
             <path d={PATHS.discharge} className={styles.glowHot} />
             <RefPipe d={PATHS.discharge} state="hot" size="gas" />
-            <RefArrow x={486} y={282} dir="up" state="hot" size="gas" />
+            <RefArrow x={486} y={290} dir="up" state="hot" size="gas" />
           </g>
 
           <g className={styles.part} {...part("warmLiquid")}>
@@ -654,91 +696,90 @@ export default function WaterCooledACAnimation({
           </g>
 
           <g className={styles.part} {...part("valve")}>
-            <rect x="448" y="384" width="44" height="50" rx="12" className={styles.halo} data-on={ring("valve")} />
-            <Valve x={470} y={416} r={10} className={styles.expValve} title={LABELS.tooltips.expansionValve} />
+            <Valve x={470} y={406} r={10} className={styles.expValve} title={LABELS.tooltips.expansionValve} />
           </g>
 
           <g className={styles.part} {...part("compressor")}>
-            <title>{LABELS.tooltips.compressor}</title>
-            <rect x="386" y="258" width="80" height="144" rx="38" className={styles.halo} data-on={ring("compressor")} />
+            <rect x="386" y="248" width="80" height="140" rx="38" className={styles.halo} data-on={ring("compressor")} />
             <g className={styles.compressorBody}>
-              <rect x="396" y="268" width="60" height="124" rx="30" className={styles.compressor} />
-              <rect x="404" y="282" width="8" height="96" rx="4" className={styles.compressorShine} />
-            </g>
-            <g className={styles.rotor}>
-              <circle cx="426" cy="312" r="21" className={styles.rotorDisc} />
-              <path
-                d="M 426 312 C 426 300 434 294 442 296 M 426 312 C 416 318 406 314 404 306 M 426 312 C 432 322 430 332 422 334"
-                className={styles.rotorBlade}
-              />
-              <circle cx="426" cy="312" r="4" className={styles.rotorHub} />
+              <rect x="396" y="258" width="60" height="120" rx="30" className={styles.compressor} />
+              <rect x="404" y="272" width="7" height="92" rx="3.5" className={styles.compressorShine} />
+              <path d={SCROLL_PATH} className={styles.scroll} />
             </g>
           </g>
 
           <g className={styles.part} {...part("hx")}>
-            <title>{LABELS.tooltips.heatExchanger}</title>
-            <rect x="510" y="226" width="104" height="188" rx="16" className={styles.halo} data-on={ring("hx")} />
-            <rect x="520" y="236" width="84" height="168" rx="10" className={styles.hx} />
+            <rect x="513" y="257" width="98" height="122" rx="14" className={styles.halo} data-on={ring("hx")} />
+            <rect x="520" y="264" width="84" height="108" rx="10" className={styles.hx} />
             {[0, 1, 2, 3, 4, 5].map((i) => (
               <rect
                 key={i}
                 x={528 + i * 12}
-                y="246"
+                y="272"
                 width="8"
-                height="148"
+                height="92"
                 rx="4"
                 className={i % 2 === 0 ? styles.plateRef : styles.plateWater}
               />
             ))}
             {/* Counterflow inside the plates, and heat crossing from refrigerant to water */}
             <g className={styles.hxDetail}>
-              <path d="M 532 268 V 384" className={styles.hxRefLine} markerEnd={`url(#${ids.headRef})`} />
-              <path d="M 592 384 V 268" className={styles.hxWaterLine} markerEnd={`url(#${ids.headWater})`} />
-              {[294, 326, 358].map((y) => (
-                <path
-                  key={y}
-                  d={`M 544 ${y} q 6 -7 12 0 q 6 7 12 0`}
-                  className={styles.heatLine}
-                  markerEnd={`url(#${ids.headHeat})`}
-                />
+              <path d="M 532 280 V 356" className={styles.hxRefLine} markerEnd={`url(#${ids.headRef})`} />
+              <path d="M 592 356 V 280" className={styles.hxWaterLine} markerEnd={`url(#${ids.headWater})`} />
+              {[288, 350].map((y) => (
+                <path key={y} d={`M 544 ${y} q 6 -7 12 0 q 6 7 12 0`} className={styles.heatLine} markerEnd={`url(#${ids.headHeat})`} />
               ))}
             </g>
           </g>
 
-          <text x="504" y="474" textAnchor="middle" className={styles.componentLabel}>
+          {/* Wall-crossing highlight */}
+          <rect x="290" y="104" width="56" height="64" rx="14" className={styles.halo} data-on={ring("wall")} />
+
+          {/* Label row under the casing: the unit's name, or the step's component callout */}
+          <text x="504" y="456" textAnchor="middle" className={styles.componentLabel} data-on={on(!current.callout)}>
             {LABELS.condenserUnit}
           </text>
-
-          {/* Water-zone tag straddles the zone's top edge */}
-          <g className={styles.zoneTag}>
+          <g className={styles.callout} data-on={on(current.callout === "compressor")}>
             <Pill
-              cx={591}
-              cy={196}
-              height={38}
+              cx={440}
+              cy={448}
+              height={36}
               padX={14}
-              maxWidth={178}
-              bgClassName={styles.zoneTagBg}
-              lines={[{ text: LABELS.waterZone, className: styles.zoneTagText, dy: 9 }]}
+              maxWidth={230}
+              bgClassName={styles.calloutBg}
+              lines={[{ text: LABELS.callouts.compressor, className: styles.calloutText, dy: 9 }]}
             />
           </g>
+          <g className={styles.callout} data-on={on(current.callout === "heatExchanger")}>
+            <Pill
+              cx={548}
+              cy={448}
+              height={36}
+              padX={14}
+              maxWidth={262}
+              bgClassName={styles.calloutBg}
+              lines={[{ text: LABELS.callouts.heatExchanger, className: styles.calloutText, dy: 9 }]}
+            />
+          </g>
+
+          {/* Water-zone tag straddles the zone's top edge */}
+          <Pill
+            cx={591}
+            cy={188}
+            height={36}
+            padX={14}
+            maxWidth={178}
+            bgClassName={styles.zoneTagBg}
+            lines={[{ text: LABELS.waterZone, className: styles.zoneTagText, dy: 9 }]}
+          />
 
           {/* ---------------- Room: air and wall unit ---------------- */}
           <g className={styles.part} {...part("air")}>
             {[192, 232, 272].map((x) => (
-              <path
-                key={x}
-                d={`M ${x} 26 q 6 5 0 10 q -6 5 0 10 q 6 5 0 10`}
-                className={styles.airWarm}
-                markerEnd={`url(#${ids.headWarm})`}
-              />
+              <path key={x} d={`M ${x} 26 q 6 5 0 10 q -6 5 0 10 q 6 5 0 10`} className={styles.airWarm} markerEnd={`url(#${ids.headWarm})`} />
             ))}
-            {[150, 196, 242].map((x) => (
-              <path
-                key={x}
-                d={`M ${x} 178 Q ${x - 8} 206 ${x - 36} 230`}
-                className={styles.airCool}
-                markerEnd={`url(#${ids.headCool})`}
-              />
+            {[168, 210, 252].map((x) => (
+              <path key={x} d={`M ${x} 178 Q ${x - 8} 204 ${x - 34} 226`} className={styles.airCool} markerEnd={`url(#${ids.headCool})`} />
             ))}
           </g>
 
@@ -746,7 +787,7 @@ export default function WaterCooledACAnimation({
             <rect x="90" y="60" width="204" height="120" rx="24" className={styles.halo} data-on={ring("unit")} />
             <rect x="100" y="70" width="184" height="100" rx="16" className={styles.unit} filter={`url(#${ids.shadow})`} />
             <line x1="114" y1="162" x2="270" y2="162" className={styles.louvre} />
-            <text x="192" y="106" textAnchor="middle" className={styles.componentLabel}>
+            <text x="192" y="106" textAnchor="middle" className={styles.unitLabel}>
               {LABELS.wallUnit}
             </text>
           </g>
@@ -755,13 +796,15 @@ export default function WaterCooledACAnimation({
             <RefPipe d={PATHS.coilOut} state="cool" size="gas" />
           </g>
 
-          {/* ---------------- Wall-unit badge: quiet in steps 1–4, loud in step 5 ---------------- */}
-          <g className={styles.badge} data-loud={loud ? "true" : "false"}>
-            <rect x="8" y="238" width="284" height="104" rx="26" className={styles.halo} data-on={ring("badge")} />
+          {/* ---------------- Badge + leader to the pipes in the wall ---------------- */}
+          <g className={styles.badge} data-loud={on(loud)}>
+            <path d={PATHS.leader} className={styles.leader} />
+            <path d="M 292 108 H 298 M 292 164 H 298" className={styles.leader} />
+            <rect x="8" y="248" width="284" height="104" rx="26" className={styles.halo} data-on={ring("badge")} />
             <g className={styles.badgeQuiet}>
               <Pill
                 cx={150}
-                cy={290}
+                cy={300}
                 height={84}
                 padX={18}
                 maxWidth={276}
@@ -775,7 +818,7 @@ export default function WaterCooledACAnimation({
             <g className={styles.badgeLoud}>
               <Pill
                 cx={150}
-                cy={290}
+                cy={300}
                 height={84}
                 padX={18}
                 maxWidth={276}
@@ -790,12 +833,7 @@ export default function WaterCooledACAnimation({
 
           {/* ---------------- Step markers ---------------- */}
           {MARKERS.map((m) => (
-            <g
-              key={m.n}
-              className={styles.marker}
-              data-on={step === m.n - 1 ? "true" : "false"}
-              transform={`translate(${m.x} ${m.y})`}
-            >
+            <g key={m.n} className={styles.marker} data-on={on(step === m.n - 1)} transform={`translate(${m.x} ${m.y})`}>
               <circle r="19" className={styles.markerDisc} />
               <text y="9" textAnchor="middle" className={styles.markerText}>
                 {m.n}
@@ -803,30 +841,16 @@ export default function WaterCooledACAnimation({
             </g>
           ))}
 
-          {/* ---------------- Legend ---------------- */}
+          {/* ---------------- Legend (2 × 2); each swatch is the pipe it names ---------------- */}
           <g className={styles.legend}>
-            <path d="M 18 529 H 62" className={styles.refRimGas} />
-            <path d="M 18 529 H 62" className={styles.refCoreGas} />
-            <path d="M 22 529 H 58" className={`${styles.legendDash} ${styles.refCool}`} />
-            <path d="M 22 529 H 58" className={`${styles.legendDash} ${styles.legendDashAlt} ${styles.refCold}`} />
-            <text x="72" y="538" className={styles.legendText}>{LABELS.legendCold}</text>
-
-            <path d="M 322 529 H 366" className={styles.refRimGas} />
-            <path d="M 322 529 H 366" className={styles.refCoreGas} />
-            <path d="M 326 529 H 362" className={`${styles.legendDash} ${styles.refWarm}`} />
-            <path d="M 326 529 H 362" className={`${styles.legendDash} ${styles.legendDashAlt} ${styles.refHot}`} />
-            <text x="376" y="538" className={styles.legendText}>{LABELS.legendHot}</text>
-
-            <path d="M 14 561 H 66" className={styles.waterRim} />
-            <path d="M 14 561 H 66" className={styles.waterCore} />
-            <path d="M 27 561 H 53" className={styles.legendDots} />
-            <text x="76" y="570" className={styles.legendText}>{LABELS.legendWater}</text>
-
-            {LABELS.loop.map((line, i) => (
-              <text key={line} x="796" y={538 + i * 32} textAnchor="end" className={styles.legendText}>
-                {line}
-              </text>
-            ))}
+            <RefSwatch x={16} y={500} state="cold" size="liquid" />
+            <text x="72" y="509" className={styles.legendText}>{LABELS.legendCold}</text>
+            <RefSwatch x={414} y={500} state="cool" size="gas" />
+            <text x="470" y="509" className={styles.legendText}>{LABELS.legendCool}</text>
+            <RefSwatch x={16} y={531} state="hot" size="gas" />
+            <text x="72" y="540" className={styles.legendText}>{LABELS.legendHot}</text>
+            <WaterPipe d="M 414 531 H 460" still />
+            <text x="470" y="540" className={styles.legendText}>{LABELS.legendWater}</text>
           </g>
         </svg>
       </div>
@@ -834,11 +858,11 @@ export default function WaterCooledACAnimation({
       {/* ---------------- Caption + controls ---------------- */}
       <div className={styles.band}>
         <p className={styles.srOnly} aria-live="polite" aria-atomic="true">
-          {announcement}
+          <span key={nav}>{announcement}</span>
         </p>
         <div className={styles.captionStack} aria-hidden="true">
           {STEPS.map((s, i) => (
-            <p key={s.title} className={styles.caption} data-on={i === step ? "true" : "false"}>
+            <p key={s.title} className={styles.caption} data-on={on(i === step)}>
               <strong className={styles.captionTitle}>{s.title}.</strong> {s.caption}
             </p>
           ))}
@@ -856,8 +880,8 @@ export default function WaterCooledACAnimation({
         >
           <button
             type="button"
-            className={`${styles.btn} ${styles.btnPlay}`}
-            onClick={() => setPlaying((p) => !p)}
+            className={cx(styles.btn, styles.btnPlay)}
+            onClick={() => setUserPlaying(!playing)}
             aria-label={playing ? LABELS.pause : LABELS.play}
           >
             {playing ? (
@@ -872,7 +896,7 @@ export default function WaterCooledACAnimation({
             )}
           </button>
 
-          <button type="button" className={styles.btn} onClick={() => goTo(step - 1)} aria-label={LABELS.previous}>
+          <button type="button" className={cx(styles.btn, styles.btnStep)} onClick={() => goTo(step - 1)} aria-label={LABELS.previous}>
             <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
               <path d="M 12.5 4 L 6.5 10 L 12.5 16" className={styles.iconStroke} />
             </svg>
@@ -884,19 +908,19 @@ export default function WaterCooledACAnimation({
                 <button
                   type="button"
                   className={styles.pill}
-                  data-on={i === step ? "true" : "false"}
+                  data-on={on(i === step)}
                   aria-current={i === step ? "step" : undefined}
                   aria-label={LABELS.goToStep(i + 1, s.title)}
                   onClick={() => goTo(i)}
                 >
                   <span aria-hidden="true">{i + 1}</span>
-                  {i === step && <span key={step} className={styles.progress} aria-hidden="true" />}
+                  {i === step && <span key={`${step}-${nav}`} className={styles.progress} aria-hidden="true" />}
                 </button>
               </li>
             ))}
           </ol>
 
-          <button type="button" className={styles.btn} onClick={() => goTo(step + 1)} aria-label={LABELS.next}>
+          <button type="button" className={cx(styles.btn, styles.btnStep)} onClick={() => goTo(step + 1)} aria-label={LABELS.next}>
             <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
               <path d="M 7.5 4 L 13.5 10 L 7.5 16" className={styles.iconStroke} />
             </svg>
