@@ -1,43 +1,48 @@
 /* ==========================================================================
-   Water-cooled AC animation — Urban Cooling
+   Water-cooled AC animation (Urban Cooling)
    --------------------------------------------------------------------------
    BRAND TOKENS: swap these for the real Urban Cooling palette.
    Everything else in this file reads from these variables.
    ========================================================================== */
 .root {
   /* Surfaces & text */
-  --uc-bg: #f2f6fb;            /* page-ish background inside the square */
-  --uc-surface: #ffffff;       /* cards, wall unit, condenser casing */
-  --uc-ink: #0b2340;           /* deep navy: outlines, headings */
-  --uc-muted: #5a6b82;         /* secondary text, quiet labels */
-  --uc-primary: #1747a6;       /* clean blue: buttons, active step */
-  --uc-accent: #0c9a6c;        /* fresh accent: highlight rings, progress */
-  --uc-focus: #1747a6;         /* keyboard focus ring */
+  --uc-bg: #f2f6fb;              /* background inside the square */
+  --uc-surface: #ffffff;         /* wall unit, condenser casing, caption band */
+  --uc-ink: #0b2340;             /* deep navy: outlines, headings, body text */
+  --uc-muted: #55667d;           /* quieter labels */
+  --uc-primary: #1747a6;         /* clean blue: active step, caption titles */
+  --uc-accent: #0c9a6c;          /* fresh accent: highlight rings, badge edge */
+  --uc-focus: #1747a6;           /* keyboard focus ring */
   --uc-font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 
-  /* Physical media (keep water and refrigerant clearly different) */
-  --refrigerant-hot: #f0592a;  /* warm / hot refrigerant gas */
-  --refrigerant-cold: #22c3e6; /* cold liquid refrigerant */
-  --water-flow: #2563eb;       /* building loop: flow (cool) */
-  --water-return: #7aa7f7;     /* building loop: return (has picked up heat) */
-  --heat: #f5a524;             /* heat and warm room air */
-  --air-cool: #38bdf8;         /* cooled room air */
+  /* Refrigerant states (diagram convention: blue = cold, red = hot) */
+  --refrigerant-cold: #3346c9;   /* cold liquid, after the expansion valve */
+  --refrigerant-cool: #0f9fb5;   /* cool gas carrying the room's heat */
+  --refrigerant-hot: #e03131;    /* hot gas, after the compressor */
+  --refrigerant-warm: #f07a12;   /* warm liquid, after the heat exchanger */
+
+  /* Building water and heat */
+  --water-flow: #1f74e0;         /* loop flow: cooler water in */
+  --water-return: #7fb0f5;       /* loop return: warmed water out */
+  --heat: #f2a516;               /* heat and warm room air */
+  --air-cool: #38bdf8;           /* cooled room air */
 
   /* Illustration neutrals */
-  --pipe-copper: #b8743f;      /* refrigerant pipe rim */
-  --pipe-core: #1f2f48;        /* refrigerant pipe interior */
-  --pipe-water-edge: #33557d;  /* water pipe double outline */
-  --pipe-water-core: #eaf2ff;  /* water pipe interior */
+  --pipe-copper: #b8743f;        /* refrigerant pipe rim */
+  --pipe-core: #fbf5ee;          /* refrigerant pipe interior */
+  --pipe-water-edge: #2f5177;    /* water pipe double outline */
+  --pipe-water-core: #e8f1ff;    /* water pipe interior */
+  --drain: #8d99aa;              /* condensate drain */
   --wall: #c9d4e2;
-  --wall-hatch: #aebdd0;
-  --slab: #d7e0eb;
+  --wall-hatch: #b1bfd1;
+  --slab: #d6dfea;
   --room: #ffffff;
   --plant: #e8eef6;
-  --furniture: #d5dfeb;
+  --furniture: #d6e0ec;
   --compressor: #46597a;
 
-  --uc-step-duration: 4500ms;  /* overridden by the stepDuration prop */
-  --uc-dim: 0.28;              /* opacity of parts not in the current step */
+  --uc-step-duration: 4500ms;    /* set from the stepDuration prop */
+  --uc-dim: 0.26;                /* opacity of parts not in the current step */
 
   /* ------------------------------------------------------------------ */
   position: relative;
@@ -74,6 +79,27 @@
   border: 0;
 }
 
+/* ------------------------------------------------- Optional heading */
+.head {
+  flex: 0 0 auto;
+  padding: clamp(8px, 2.4cqi, 18px) clamp(12px, 3.4cqi, 24px) 0;
+}
+.eyebrow {
+  margin: 0;
+  font-size: clamp(11px, 0.4rem + 1.2cqi, 13px);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--uc-accent);
+}
+.headline {
+  margin: 0.15em 0 0;
+  font-size: clamp(15px, 0.5rem + 2.4cqi, 24px);
+  font-weight: 800;
+  line-height: 1.2;
+  color: var(--uc-ink);
+}
+
 /* ---------------------------------------------------------------- Stage */
 .stage {
   position: relative;
@@ -87,7 +113,6 @@
   width: 100%;
   height: 100%;
   display: block;
-  overflow: visible;
 }
 
 .svg text {
@@ -106,9 +131,7 @@
   font-size: 26px;
   font-weight: 700;
   fill: var(--uc-muted);
-  letter-spacing: 0.01em;
 }
-
 .componentLabel {
   font-size: 26px;
   font-weight: 700;
@@ -123,50 +146,66 @@
   opacity: var(--uc-dim);
 }
 
-/* -------------------------------------------------------------- Pipes */
-.refOuter,
-.refCore,
-.waterOuter,
-.waterCore,
-.flow {
+/* --------------------------------------------------------- Refrigerant */
+/* Slim copper-rimmed pipes with dashes. The gas pipe is visibly larger. */
+.refRimGas,
+.refRimLiquid,
+.refCoreGas,
+.refCoreLiquid,
+.refFlow {
   fill: none;
   stroke-linejoin: round;
-}
-
-/* Refrigerant: slim, copper-rimmed, dark core, dashed flow */
-.refOuter { stroke: var(--pipe-copper); stroke-width: 13; stroke-linecap: butt; }
-.refCore { stroke: var(--pipe-core); stroke-width: 8; stroke-linecap: butt; }
-.refFlowHot,
-.refFlowCold {
-  stroke-width: 4;
-  stroke-dasharray: 9 7;
   stroke-linecap: butt;
+}
+.refRimGas { stroke: var(--pipe-copper); stroke-width: 17; }
+.refCoreGas { stroke: var(--pipe-core); stroke-width: 11; }
+.refRimLiquid { stroke: var(--pipe-copper); stroke-width: 11; }
+.refCoreLiquid { stroke: var(--pipe-core); stroke-width: 6; }
+
+.refFlow {
+  stroke-dasharray: 9 7;
   animation: refFlow 700ms linear infinite;
 }
-.refFlowHot { stroke: var(--refrigerant-hot); }
-.refFlowCold { stroke: var(--refrigerant-cold); }
+.refFlowGas { stroke-width: 6; }
+.refFlowLiquid { stroke-width: 4; }
+.refCold { stroke: var(--refrigerant-cold); }
+.refCool { stroke: var(--refrigerant-cool); }
+.refHot { stroke: var(--refrigerant-hot); }
+.refWarm { stroke: var(--refrigerant-warm); }
 
+.refArrowCold,
+.refArrowCool,
 .refArrowHot,
-.refArrowCold {
-  stroke: var(--pipe-core);
+.refArrowWarm {
+  stroke: var(--uc-surface);
   stroke-width: 2.5;
   stroke-linejoin: round;
+  paint-order: stroke;
 }
-.refArrowHot { fill: var(--refrigerant-hot); }
 .refArrowCold { fill: var(--refrigerant-cold); }
+.refArrowCool { fill: var(--refrigerant-cool); }
+.refArrowHot { fill: var(--refrigerant-hot); }
+.refArrowWarm { fill: var(--refrigerant-warm); }
 
-/* Water: wide, double outline, round bubbles */
-.waterOuter { stroke: var(--pipe-water-edge); stroke-width: 26; stroke-linecap: butt; }
-.waterCore { stroke: var(--pipe-water-core); stroke-width: 19; stroke-linecap: butt; }
-.waterFlow,
-.waterFlowReturn {
+/* -------------------------------------------------------------- Water */
+/* Wide pipes with a double outline and round bubbles. */
+.waterRim,
+.waterCore,
+.waterFlow {
+  fill: none;
+  stroke-linejoin: round;
+  stroke-linecap: butt;
+}
+.waterRim { stroke: var(--pipe-water-edge); stroke-width: 26; }
+.waterCore { stroke: var(--pipe-water-core); stroke-width: 19; }
+.waterFlow {
   stroke-width: 10;
   stroke-linecap: round;
   stroke-dasharray: 0 22;
   animation: waterFlow 1100ms linear infinite;
 }
-.waterFlow { stroke: var(--water-flow); }
-.waterFlowReturn { stroke: var(--water-return); }
+.waterSupply { stroke: var(--water-flow); }
+.waterReturn { stroke: var(--water-return); }
 .waterArrow,
 .waterArrowReturn {
   stroke: var(--pipe-water-edge);
@@ -176,20 +215,75 @@
 .waterArrow { fill: var(--water-flow); }
 .waterArrowReturn { fill: var(--water-return); }
 
-/* Glows that sit under a pipe when it is the star of the step */
-.glowHot,
-.glowGas {
+.isoValve,
+.expValve {
+  stroke-linejoin: round;
+}
+.isoValve path:first-of-type {
+  fill: var(--uc-surface);
+  stroke: var(--pipe-water-edge);
+  stroke-width: 3;
+}
+.expValve path:first-of-type {
+  fill: var(--uc-surface);
+  stroke: var(--uc-ink);
+  stroke-width: 2.5;
+}
+.valveStem {
   fill: none;
-  stroke-width: 26;
+  stroke: var(--uc-ink);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+/* Glows under a pipe when it is the star of the step */
+.glowHot,
+.glowCool {
+  fill: none;
+  stroke-width: 30;
   stroke-linejoin: round;
   stroke-linecap: round;
   opacity: 0;
   transition: opacity 400ms ease;
 }
 .glowHot { stroke: var(--refrigerant-hot); }
-.glowGas { stroke: var(--refrigerant-hot); }
-.root[data-step="3"] .glowHot { opacity: 0.22; animation: glow 1400ms ease-in-out infinite; }
-.root[data-step="2"] .glowGas { opacity: 0.18; animation: glow 1400ms ease-in-out infinite; }
+.glowCool { stroke: var(--refrigerant-cool); }
+.root[data-step="3"] .glowHot { opacity: 0.2; animation: glow 1400ms ease-in-out infinite; }
+.root[data-step="2"] .glowCool { opacity: 0.2; animation: glow 1400ms ease-in-out infinite; }
+
+/* -------------------------------------------------------- Condensate */
+.drain {
+  fill: none;
+  stroke: var(--drain);
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.drainEnd {
+  fill: none;
+  stroke: var(--drain);
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.drainLabel {
+  font-size: 26px;
+  font-weight: 600;
+  fill: var(--uc-muted);
+}
+
+/* ------------------------------------------------------------ Notes */
+.noteLabel {
+  font-size: 26px;
+  font-weight: 600;
+  fill: var(--uc-muted);
+}
+.noteArrow {
+  fill: none;
+  stroke: var(--water-return);
+  stroke-width: 5;
+  stroke-linecap: round;
+}
 
 /* ------------------------------------------------------------- Air */
 .airWarm,
@@ -211,6 +305,8 @@
 }
 .headWarm { fill: var(--heat); }
 .headCool { fill: var(--air-cool); }
+.headRef { fill: var(--refrigerant-warm); }
+.headWater { fill: var(--water-return); }
 
 /* -------------------------------------------------------- Components */
 .unit,
@@ -233,7 +329,9 @@
   stroke-width: 3;
   transition: fill 500ms ease;
 }
-.root[data-step="3"] .compressor { fill: color-mix(in srgb, var(--compressor) 55%, var(--refrigerant-hot)); }
+.root[data-step="3"] .compressor {
+  fill: color-mix(in srgb, var(--compressor) 50%, var(--refrigerant-hot));
+}
 .compressorShine { fill: #ffffff; opacity: 0.18; }
 .compressorBody {
   transform-box: fill-box;
@@ -250,33 +348,39 @@
 .rotorBlade { fill: none; stroke: var(--compressor); stroke-width: 4; stroke-linecap: round; }
 .rotorHub { fill: var(--compressor); }
 
-.plateRef { fill: var(--refrigerant-hot); opacity: 0.35; }
-.plateWater { fill: var(--water-flow); opacity: 0.35; }
+.plateRef { fill: var(--refrigerant-hot); opacity: 0.22; }
+.plateWater { fill: var(--water-flow); opacity: 0.26; }
 
-.heatTransfer { opacity: 0; transition: opacity 400ms ease; }
-.root[data-step="4"] .heatTransfer,
-.root[data-step="5"] .heatTransfer { opacity: 1; }
+.hxDetail { opacity: 0; transition: opacity 400ms ease; }
+.root[data-step="4"] .hxDetail,
+.root[data-step="5"] .hxDetail { opacity: 1; }
+.hxRefLine,
+.hxWaterLine {
+  fill: none;
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+.hxRefLine { stroke: var(--refrigerant-warm); }
+.hxWaterLine { stroke: var(--water-flow); }
 .heatLine {
   fill: none;
   stroke: var(--heat);
-  stroke-width: 4.5;
+  stroke-width: 4;
   stroke-linecap: round;
-  stroke-dasharray: 8 5;
-  animation: airFlow 900ms linear infinite;
 }
 
 /* ---------------------------------------------------------- Water zone */
-.zoneShape {
+.zone {
   fill: var(--water-flow);
   fill-opacity: 0.07;
   stroke: var(--water-flow);
   stroke-width: 3;
   stroke-dasharray: 12 8;
   stroke-linejoin: round;
-  transition: fill-opacity 500ms ease, stroke-width 500ms ease;
+  transition: fill-opacity 500ms ease;
 }
-.zone[data-emphasis="true"] .zoneShape {
-  fill-opacity: 0.13;
+.zone[data-emphasis="true"] {
+  fill-opacity: 0.12;
   stroke-width: 4;
   animation: zoneMarch 1200ms linear infinite;
 }
@@ -306,42 +410,40 @@
 .badgeLoud {
   transition: opacity 500ms ease;
 }
+.badgeLoud { opacity: 0; }
+.badge[data-loud="true"] .badgeQuiet { opacity: 0; }
+.badge[data-loud="true"] .badgeLoud { opacity: 1; }
+
 .badgeQuietBg {
   fill: var(--uc-surface);
   stroke: var(--uc-accent);
   stroke-width: 3;
 }
-.badgeQuietText {
+.badgeTitleQuiet {
   font-size: 26px;
   font-weight: 700;
   fill: var(--uc-ink);
 }
-.badgeLoud { opacity: 0; }
-.badge[data-emphasis="true"] .badgeQuiet { opacity: 0; }
-.badge[data-emphasis="true"] .badgeLoud { opacity: 1; }
+.badgeTextQuiet {
+  font-size: 26px;
+  font-weight: 500;
+  fill: var(--uc-muted);
+}
 .badgeLoudBg {
   fill: var(--uc-ink);
   stroke: var(--uc-accent);
   stroke-width: 4;
 }
-.badgeLoudTitle {
-  font-size: 28px;
+.badgeTitleLoud {
+  font-size: 26px;
   font-weight: 800;
   fill: #ffffff;
 }
-.badgeLoudText {
+.badgeTextLoud {
   font-size: 26px;
-  font-weight: 600;
-  fill: #bff3df;
+  font-weight: 500;
+  fill: #bdf2dc;
 }
-.noWaterDrop { fill: var(--water-flow); }
-.noWaterSlash {
-  stroke: var(--uc-surface);
-  stroke-width: 7;
-  stroke-linecap: round;
-}
-.noWaterIcon .noWaterSlash + .noWaterSlash { display: none; }
-.badgeQuiet .noWaterSlash { stroke: var(--uc-surface); }
 
 /* ------------------------------------------------------------ Markers */
 .markerDisc {
@@ -368,14 +470,14 @@
   font-weight: 600;
   fill: var(--uc-ink);
 }
-.legendDashHot,
-.legendDashCold {
+.legendDash {
   fill: none;
-  stroke-width: 4;
-  stroke-dasharray: 6 4;
+  stroke-width: 6;
+  stroke-dasharray: 8 10;
 }
-.legendDashHot { stroke: var(--refrigerant-hot); }
-.legendDashCold { stroke: var(--refrigerant-cold); }
+.legendDashAlt {
+  stroke-dashoffset: 9;
+}
 .legendDots {
   fill: none;
   stroke: var(--water-flow);
@@ -389,8 +491,9 @@
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
-  gap: clamp(6px, 1.6cqi, 12px);
-  padding: clamp(8px, 2.2cqi, 16px) clamp(12px, 3.4cqi, 24px) clamp(10px, 2.6cqi, 18px);
+  gap: clamp(5px, 1.6cqi, 12px);
+  padding: 12px 16px; /* fallback */
+  padding: clamp(6px, 2.2cqi, 16px) clamp(8px, 4.5cqi - 7px, 24px) clamp(7px, 2.6cqi, 18px);
   background: var(--uc-surface);
   border-top: 1px solid color-mix(in srgb, var(--uc-ink) 10%, transparent);
 }
@@ -398,12 +501,16 @@
 /* All captions share one grid cell so the band never changes height. */
 .captionStack {
   display: grid;
+  align-items: center;
 }
 .caption {
   grid-area: 1 / 1;
   margin: 0;
-  font-size: clamp(12.5px, 0.5rem + 1.45cqi, 17px);
-  line-height: 1.38;
+  font-size: 15px; /* fallback without container units */
+  font-size: clamp(12px, 0.25rem + 2.1cqi, 17px);
+  line-height: 1.36;
+  letter-spacing: -0.003em;
+  text-wrap: pretty;
   color: var(--uc-ink);
   opacity: 0;
   visibility: hidden;
@@ -436,7 +543,8 @@
 
 .btn,
 .pill {
-  --size: clamp(30px, 6.4cqi, 40px);
+  --size: 34px; /* fallback without container units */
+  --size: clamp(28px, 6.2cqi, 40px);
   position: relative;
   display: inline-grid;
   place-items: center;
@@ -444,7 +552,7 @@
   height: var(--size);
   padding: 0;
   margin: 0;
-  border: 2px solid color-mix(in srgb, var(--uc-ink) 22%, transparent);
+  border: 2px solid color-mix(in srgb, var(--uc-ink) 30%, transparent);
   border-radius: 999px;
   background: var(--uc-surface);
   color: var(--uc-ink);
@@ -502,14 +610,11 @@
   z-index: 1;
 }
 
-/* Time-left indicator inside the active pill while auto-advancing */
+/* Time left, filling the active step button while auto-advancing */
 .progress {
   position: absolute;
-  left: 0;
-  bottom: 0;
-  height: 100%;
-  width: 100%;
-  background: color-mix(in srgb, #ffffff 22%, transparent);
+  inset: 0;
+  background: color-mix(in srgb, #ffffff 24%, transparent);
   transform-origin: left center;
   transform: scaleX(0);
   animation: progress var(--uc-step-duration) linear forwards;
@@ -523,8 +628,7 @@
 }
 
 /* ---------------------------------------------- Motion: pause & reduce */
-.root[data-moving="false"] .svg *,
-.root[data-moving="false"] .svg *::before {
+.root[data-moving="false"] .svg * {
   animation-play-state: paused !important;
 }
 
@@ -537,11 +641,9 @@
   .caption,
   .badgeQuiet,
   .badgeLoud,
-  .heatTransfer {
+  .hxDetail,
+  .zone {
     transition: none !important;
-  }
-  .halo[data-on="true"] {
-    stroke-width: 5;
   }
   .progress {
     display: none;
