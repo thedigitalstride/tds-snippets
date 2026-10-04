@@ -23,14 +23,14 @@ export type Part =
   | "air" //          room air in and out of the wall unit
   | "unit" //         wall unit outline
   | "coil" //         refrigerant loop inside the wall unit
-  | "suction" //      refrigerant gas line: wall unit → compressor
+  | "suction" //      heat line: refrigerant gas from the wall unit → compressor
   | "compressor"
   | "discharge" //    hot refrigerant: compressor → heat exchanger
   | "hx" //           plate heat exchanger
   | "warmLiquid" //   refrigerant: heat exchanger → expansion valve
   | "valve" //        expansion valve
   | "liquid" //       refrigerant liquid line: expansion valve → wall unit
-  | "water"; //       building water loop, taps, isolation valves, roof note
+  | "water"; //       building water in and out of the heat exchanger
 
 /** Things that can wear the pulsing highlight ring (one per step). */
 export type Focus = "unit" | "wall" | "compressor" | "hx" | "badge";
@@ -60,8 +60,9 @@ export interface Labels {
   condenserUnit: string;
   waterZone: string;
   callouts: Record<Callout, string>;
-  condensateDrain: readonly string[]; // one entry per line
-  toRoof: readonly string[]; //         one entry per line
+  condensatePump: string;
+  waterIn: string;
+  waterOut: string;
   badge: readonly [string, string]; //  [bold line, second line]
   legendHeat: string;
   legendCool: string;
@@ -69,7 +70,7 @@ export interface Labels {
   /** Hover tooltips on small parts that are not labelled on the drawing. */
   tooltips: {
     expansionValve: string;
-    isolationValve: string;
+    condensatePump: string;
   };
   /* Accessible copy */
   svgTitle: string;
@@ -94,7 +95,7 @@ export const STEPS: readonly Step[] = [
   {
     title: "Refrigerant carries the heat",
     caption:
-      "Refrigerant gas carries the heat through slim insulated pipes to the condenser unit. No water travels this way.",
+      "The room's heat travels through slim insulated pipes to the condenser unit in the cupboard.",
     focus: "wall",
     active: ["suction", "liquid"],
   },
@@ -131,23 +132,25 @@ export const LABELS: Labels = {
   condenserUnit: "Condenser unit",
   waterZone: "Water zone",
   callouts: { compressor: "Compressor", heatExchanger: "Heat exchanger" },
-  condensateDrain: ["Condensate", "drain"],
-  toRoof: ["To rooftop", "coolers"],
+  condensatePump: "Condensate pump",
+  waterIn: "Water in",
+  waterOut: "Water out",
   badge: ["Refrigerant only", "no water piped in"],
   legendHeat: "Heat",
   legendCool: "Cool",
   legendWater: "Building water",
   tooltips: {
     expansionValve: "Expansion valve",
-    isolationValve: "Isolation valve",
+    condensatePump: "Condensate pump",
   },
   svgTitle: "How water-cooled air conditioning works",
   svgDesc:
     "A water-cooled air conditioning system in an apartment, shown in five steps. A wall unit absorbs heat from the room " +
-    "into refrigerant, which travels through slim insulated pipes to a condenser unit in a cupboard, where a compressor " +
-    "and heat exchanger pass the heat to water from the building's shared water loop. Water stays in the condenser unit " +
-    "and the building loop; only refrigerant travels to the wall unit. Red lines show heat, light blue lines show cool " +
-    "refrigerant and air, and thicker mid-blue lines show the building's water.",
+    "into refrigerant, which carries it through slim insulated pipes to a condenser unit in a cupboard. There a compressor " +
+    "and heat exchanger pass the heat to the building's water, which flows into the heat exchanger and out again, warmer. " +
+    "Alongside the refrigerant pipes, a small condensate pump returns condensate from the wall unit to the condenser unit. " +
+    "Building water stays in the condenser unit; only refrigerant travels to the wall unit. Red lines show heat, light " +
+    "blue lines show cool refrigerant and air, and thicker mid-blue lines show the building's water.",
   controlsGroup: "Animation controls",
   play: "Play animation",
   pause: "Pause animation",
@@ -158,18 +161,20 @@ export const LABELS: Labels = {
 };
 
 /* ========================================================================== */
-/*  Geometry (viewBox 0 0 800 516)                                             */
+/*  Geometry (viewBox 0 0 760 516)                                             */
 /*  Refrigerant cycle: wall-unit coil → gas line → compressor → heat           */
 /*  exchanger → expansion valve → liquid line → coil. Paths run with the flow. */
 /* ========================================================================== */
 
-const VB_W = 800;
+const VB_W = 760;
 const VB_H = 516;
 
 const PATHS = {
-  /** Inside the wall unit: in along the bottom, round the bend, out along the top. */
-  coil: "M 284 146 H 124 A 10 10 0 0 1 124 126 H 284",
-  /** Gas line: wall unit → through the wall → compressor. Cool, carrying the room's heat. */
+  /** Inside the wall unit: cool refrigerant in along the bottom… */
+  coilIn: "M 284 146 H 124",
+  /** …round the bend, picking up the room's heat, and out along the top. */
+  coilOut: "M 124 146 A 10 10 0 0 1 124 126 H 284",
+  /** Heat line: wall unit → through the wall → compressor. */
   suction: "M 284 126 H 404 V 272",
   /** Hot refrigerant: compressor → top of the heat exchanger. */
   discharge: "M 456 296 H 486 V 280 H 520",
@@ -177,23 +182,18 @@ const PATHS = {
   warmLiquid: "M 532 372 V 406 H 478",
   /** Liquid line: expansion valve → through the wall → wall unit. */
   liquid: "M 462 406 H 358 V 146 H 284",
-  /** Building loop: flow comes down from the roof, return goes back up. */
-  flowRiser: "M 752 -4 V 470",
-  returnRiser: "M 708 470 V -4",
-  /** Counterflow: water enters the heat exchanger at the bottom, leaves at the top.
-      The flow tap hops over the return riser. */
-  flowTap: "M 752 350 H 721 A 13 13 0 0 0 695 350 H 604",
-  flowHop: "M 721 350 A 13 13 0 0 0 695 350",
-  returnTap: "M 604 280 H 708",
-  /** Condensate drain: thin light grey, outside the water zone, runs to waste. */
-  drain: "M 112 170 V 462",
-  /** Badge leader: from the badge to the pipe pair where it crosses the wall. */
-  leader: "M 256 258 L 298 164 V 108",
-  /** Where water exists. It ends inside the condenser unit, at x = 500. */
-  zone: "M 500 188 H 682 V 6 H 796 V 476 H 682 V 428 H 500 Z",
+  /** Building water, counterflow: in at the bottom of the heat exchanger, out at the top. */
+  waterIn: "M 752 350 H 604",
+  waterOut: "M 604 280 H 752",
+  /** Condensate: wall unit → through the wall above the refrigerant pair → pump → condenser unit. */
+  condensate: "M 284 104 H 440 V 206",
+  /** Badge leader: from the badge to the refrigerant pair where it crosses the wall. */
+  leader: "M 256 258 L 298 156 V 116",
+  /** Where water exists: the heat-exchanger side of the condenser unit, out to the edge. */
+  zone: "M 500 186 H 758 V 428 H 500 Z",
 } as const;
 
-const CASING = { x: 380, y: 208, w: 248, h: 212, r: 16 } as const;
+const CASING = { x: 380, y: 208, w: 236, h: 212, r: 16 } as const;
 
 /** Two-turn scroll (Archimedean spiral): the compressor's working part, drawn as a line. */
 const SCROLL_PATH = (() => {
@@ -532,54 +532,41 @@ export default function WaterCooledACAnimation({
           {/* ---------------- Water zone, outside the casing ---------------- */}
           <path d={PATHS.zone} className={styles.zone} data-emphasis={on(step >= 3)} />
 
-          {/* ---------------- Condensate drain: secondary, never lit ---------------- */}
-          <g className={styles.drainGroup}>
-            <path d={PATHS.drain} className={styles.drain} markerEnd={`url(#${ids.headGrey})`} />
-            {LABELS.condensateDrain.map((line, i) => (
-              <text key={line} x="124" y={374 + i * 26} className={styles.drainLabel}>
-                {line}
-              </text>
-            ))}
+          {/* ---------------- Condensate: thin grey, secondary, never lit ---------------- */}
+          <g className={styles.condensateGroup}>
+            <path d={PATHS.condensate} className={styles.condensate} markerEnd={`url(#${ids.headGrey})`} />
+            <g transform="translate(378 104)">
+              <title>{LABELS.tooltips.condensatePump}</title>
+              <circle r="13" className={styles.pump} />
+              <text y="7" textAnchor="middle" className={styles.pumpGlyph}>P</text>
+            </g>
+            <text x="398" y="90" className={styles.noteLabel}>{LABELS.condensatePump}</text>
           </g>
 
           {/* ---------------- Condenser casing (no fan, no grille) + water zone inside it ---------------- */}
           <rect x={CASING.x} y={CASING.y} width={CASING.w} height={CASING.h} rx={CASING.r} className={styles.casing} />
           <path d={PATHS.zone} className={styles.zone} clipPath={`url(#${ids.boxClip})`} data-emphasis={on(step >= 3)} />
 
-          {/* ---------------- Building water loop (mid blue, thicker) ---------------- */}
+          {/* ---------------- Building water in and out (mid blue, thicker) ---------------- */}
           <g className={styles.part} {...part("water")}>
-            <FlowLine d={PATHS.returnRiser} flow="water" />
-            <FlowLine d={PATHS.flowRiser} flow="water" />
-            <FlowLine d={PATHS.returnTap} flow="water" />
-            <path d={PATHS.flowHop} className={styles.hopGap} />
-            <FlowLine d={PATHS.flowTap} flow="water" />
-            <Arrow x={708} y={150} dir="up" flow="water" />
-            <Arrow x={708} y={430} dir="up" flow="water" />
-            <Arrow x={752} y={150} dir="down" flow="water" />
-            <Arrow x={752} y={430} dir="down" flow="water" />
-            <Arrow x={672} y={280} dir="right" flow="water" />
-            <Arrow x={672} y={350} dir="left" flow="water" />
-            <Valve x={636} y={280} r={9} title={LABELS.tooltips.isolationValve} />
-            <Valve x={636} y={350} r={9} title={LABELS.tooltips.isolationValve} />
-            {/* Heat leaves the building at the rooftop coolers */}
-            <path d="M 690 84 V 36" className={styles.roofArrow} markerEnd={`url(#${ids.headHeat})`} />
-            {LABELS.toRoof.map((line, i) => (
-              <text key={line} x="674" y={50 + i * 28} textAnchor="end" className={styles.noteLabel}>
-                {line}
-              </text>
-            ))}
+            <FlowLine d={PATHS.waterOut} flow="water" />
+            <FlowLine d={PATHS.waterIn} flow="water" />
+            <Arrow x={690} y={280} dir="right" flow="water" />
+            <Arrow x={690} y={350} dir="left" flow="water" />
+            <text x="744" y="262" textAnchor="end" className={styles.waterLabel}>{LABELS.waterOut}</text>
+            <text x="744" y="386" textAnchor="end" className={styles.waterLabel}>{LABELS.waterIn}</text>
           </g>
 
-          {/* ---------------- Refrigerant: two thin light-blue lines through the wall ---------------- */}
+          {/* ---------------- Refrigerant through the wall: heat line (red) out, cool line (light blue) back ---------------- */}
           <g className={styles.part} {...part("liquid")}>
             <FlowLine d={PATHS.liquid} flow="cool" />
             <Arrow x={358} y={300} dir="up" flow="cool" />
             <Arrow x={326} y={146} dir="left" flow="cool" />
           </g>
           <g className={styles.part} {...part("suction")}>
-            <FlowLine d={PATHS.suction} flow="cool" />
-            <Arrow x={318} y={126} dir="right" flow="cool" />
-            <Arrow x={404} y={196} dir="down" flow="cool" />
+            <FlowLine d={PATHS.suction} flow="heat" />
+            <Arrow x={318} y={126} dir="right" flow="heat" />
+            <Arrow x={404} y={196} dir="down" flow="heat" />
           </g>
 
           <g className={styles.part} {...part("discharge")}>
@@ -616,10 +603,10 @@ export default function WaterCooledACAnimation({
           </g>
 
           {/* Wall-crossing highlight */}
-          <rect x="290" y="104" width="56" height="64" rx="14" className={styles.halo} data-on={ring("wall")} />
+          <rect x="290" y="113" width="56" height="46" rx="12" className={styles.halo} data-on={ring("wall")} />
 
           {/* Label row under the casing: the unit's name, or the step's component callout */}
-          <text x="504" y="456" textAnchor="middle" className={styles.componentLabel} data-on={on(!current.callout)}>
+          <text x="498" y="456" textAnchor="middle" className={styles.componentLabel} data-on={on(!current.callout)}>
             {LABELS.condenserUnit}
           </text>
           <g className={styles.callout} data-on={on(current.callout === "compressor")}>
@@ -675,13 +662,14 @@ export default function WaterCooledACAnimation({
             </text>
           </g>
           <g className={styles.part} {...part("coil")}>
-            <FlowLine d={PATHS.coil} flow="cool" />
+            <FlowLine d={PATHS.coilIn} flow="cool" />
+            <FlowLine d={PATHS.coilOut} flow="heat" />
           </g>
 
           {/* ---------------- Badge + leader to the pipes in the wall ---------------- */}
           <g className={styles.badge} data-loud={on(loud)}>
             <path d={PATHS.leader} className={styles.leader} />
-            <path d="M 292 108 H 298 M 292 164 H 298" className={styles.leader} />
+            <path d="M 292 116 H 298 M 292 156 H 298" className={styles.leader} />
             <rect x="8" y="248" width="284" height="104" rx="26" className={styles.halo} data-on={ring("badge")} />
             <g className={styles.badgeQuiet}>
               <Pill

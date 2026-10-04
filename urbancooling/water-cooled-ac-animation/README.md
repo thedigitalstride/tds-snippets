@@ -5,6 +5,8 @@ A square, step-by-step explainer showing how a water-cooled air conditioning sys
 There are five captioned steps:
 - The grey dashed water zone always stops inside the condenser unit.
 - The "Refrigerant only, no water piped in" badge points at the two refrigerant lines where they cross the wall, in every step.
+- Condensate from the wall unit is shown as a thin grey line, pumped back to the condenser unit alongside the refrigerant lines. It runs away from the room, so "no water piped in" stays accurate.
+- Building water is shown simply as **Water in** (bottom of the heat exchanger) and **Water out** (top, warmer), so the heat exchanger works in counterflow.
 
 Files:
 - `WaterCooledACAnimation.tsx`: client component (`"use client"`, default export, no dependencies)
@@ -53,13 +55,13 @@ export default function Page() {
 
 ## Visual language and brand colours
 
-The illustration is simple line art. Equipment is drawn in black and the building context (room, wall, cupboard, drain, water zone) in greys. Colour is used **only for the three flows**, each drawn as one line with arrowheads and travelling beads:
+The illustration is simple line art. Equipment is drawn in black and the building context (room, wall, cupboard, condensate line and pump, water zone) in greys. Colour is used **only for the three flows**, each drawn as one line with arrowheads and travelling beads:
 
 | Flow | Token | Default | Used for |
 |---|---|---|---|
-| Heat (red) | `--uc-heat` | `#e8412f` | hot refrigerant from the compressor to the heat exchanger, heat marks in the heat exchanger, warm room air, heat going to the rooftop coolers |
-| Cool (light blue) | `--uc-cool` | `#4fb3f0` | all other refrigerant (the two thin lines through the wall) and cool air from the wall unit |
-| Building water (mid blue, thicker) | `--uc-water` | `#1857ba` | the building loop flow and return, and the taps into the heat exchanger |
+| Heat (red) | `--uc-heat` | `#e8412f` | refrigerant carrying the room's heat (from the wall-unit coil, through the wall, to the compressor and on to the heat exchanger), heat marks in the heat exchanger, warm room air |
+| Cool (light blue) | `--uc-cool` | `#4fb3f0` | refrigerant after the heat exchanger (through the expansion valve and back to the wall unit) and cool air from the wall unit |
+| Building water (mid blue, thicker) | `--uc-water` | `#1857ba` | water in and water out of the heat exchanger |
 
 All tokens are public `--uc-*` custom properties, listed with their defaults at the top of `WaterCooledACAnimation.module.css`. Set any of them in any of these places:
 - on the component, via `className`
@@ -82,7 +84,7 @@ Internally the component reads private `--_uc-*` copies whose fallbacks are the 
 
 | Group | Tokens |
 |---|---|
-| Neutrals | `--uc-bg`, `--uc-ink` (near-black), `--uc-grey-1` (dark grey: body text, secondary labels), `--uc-grey-2` (mid grey: context lines, water-zone outline), `--uc-grey-3` (light grey: drain, plates, borders), `--uc-focus`, `--uc-font`, `--uc-max-width` |
+| Neutrals | `--uc-bg`, `--uc-ink` (near-black), `--uc-grey-1` (dark grey: body text, secondary labels), `--uc-grey-2` (mid grey: context lines, condensate line, water-zone outline), `--uc-grey-3` (light grey: plates, borders), `--uc-focus`, `--uc-font`, `--uc-max-width` |
 | Flows | `--uc-heat`, `--uc-cool`, `--uc-water` |
 | Other | `--uc-dim` (opacity of parts not in the current step) |
 
@@ -132,7 +134,7 @@ Length limits:
 **Not colour alone**
 - The three flows differ in lightness (see above), and water is also drawn thicker.
 - Every flow line carries direction arrowheads, and the legend shows the three line samples.
-- Heat appears only inside the condenser unit and in the room air.
+- Red always means heat on the move: from the room air into the wall unit, along the refrigerant line to the condenser unit, and into the water in the heat exchanger.
 
 **Forced colours:** the diagram keeps its palette, and the active step uses the system `Highlight` colour.
 

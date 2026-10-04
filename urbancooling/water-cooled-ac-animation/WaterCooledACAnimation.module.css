@@ -17,15 +17,15 @@
   --_uc-bg: var(--uc-bg, #ffffff);              /* background inside the square */
   --_uc-ink: var(--uc-ink, #15181d);            /* near-black: equipment, labels, controls */
   --_uc-grey-1: var(--uc-grey-1, #4b525c);      /* dark grey: body text, secondary labels, leader */
-  --_uc-grey-2: var(--uc-grey-2, #8b929c);      /* mid grey: room/wall lines, water-zone outline */
-  --_uc-grey-3: var(--uc-grey-3, #d5d9de);      /* light grey: drain, plates, borders, soft fills */
+  --_uc-grey-2: var(--uc-grey-2, #8b929c);      /* mid grey: room/wall lines, condensate, water-zone outline */
+  --_uc-grey-3: var(--uc-grey-3, #d5d9de);      /* light grey: plates, borders, soft fills */
   --_uc-focus: var(--uc-focus, #15181d);        /* keyboard focus ring */
   --_uc-font: var(--uc-font, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif);
   --_uc-max-width: var(--uc-max-width, 760px);  /* designed for 320–760px */
 
   /* The only three flow colours */
-  --_uc-heat: var(--uc-heat, #e8412f);          /* red: heat (hot refrigerant, warm air, heat out) */
-  --_uc-cool: var(--uc-cool, #4fb3f0);          /* light blue: cool refrigerant and cool air */
+  --_uc-heat: var(--uc-heat, #e8412f);          /* red: heat (refrigerant carrying heat, warm room air) */
+  --_uc-cool: var(--uc-cool, #4fb3f0);          /* light blue: cooled refrigerant and cool air */
   --_uc-water: var(--uc-water, #1857ba);        /* mid blue: building water (drawn thicker) */
 
   --_uc-dim: var(--uc-dim, 0.22);               /* opacity of parts not in the current step */
@@ -162,7 +162,7 @@
 .unitLabel,
 .legendText,
 .noteLabel,
-.drainLabel,
+.waterLabel,
 .zoneTagText,
 .calloutText {
   font-size: 26px;
@@ -171,8 +171,15 @@
 .componentLabel,
 .unitLabel { font-weight: 700; fill: var(--_uc-ink); }
 .legendText { font-weight: 600; fill: var(--_uc-ink); }
-.noteLabel { font-weight: 600; fill: var(--_uc-grey-1); }
-.drainLabel { font-weight: 500; fill: var(--_uc-grey-1); }
+.noteLabel { font-weight: 500; fill: var(--_uc-grey-1); }
+.waterLabel {
+  font-weight: 650;
+  fill: var(--_uc-water);
+  paint-order: stroke;
+  stroke: var(--_uc-bg);
+  stroke-width: 6px;
+  stroke-linejoin: round;
+}
 
 /* Wider containers: three tiers, kept below the caption's visual weight. */
 @container (min-width: 480px) {
@@ -183,10 +190,12 @@
     letter-spacing: 0.06em;
   }
   .legendText,
-  .noteLabel,
-  .drainLabel {
+  .noteLabel {
     font-size: 20px;
     font-weight: 500;
+  }
+  .waterLabel {
+    font-size: 22px;
   }
   .legendText { fill: var(--_uc-grey-1); }
   .zoneTagText,
@@ -240,24 +249,9 @@
 .arrowCool { fill: var(--_uc-cool); }
 .arrowWater { fill: var(--_uc-water); }
 
-/* Where the flow tap hops over the return riser, cut a gap in the riser. */
-.hopGap {
-  fill: none;
-  stroke: var(--_uc-bg);
-  stroke-width: 15;
-}
-
 /* Legend samples are the real lines, held still. */
 .still {
   animation: none !important;
-}
-
-/* Heat leaving the building at the rooftop coolers */
-.roofArrow {
-  fill: none;
-  stroke: var(--_uc-heat);
-  stroke-width: 4;
-  stroke-linecap: round;
 }
 
 /* ------------------------------------------------------------- Air */
@@ -273,7 +267,7 @@
 .airCool { stroke: var(--_uc-cool); }
 .headHeat { fill: var(--_uc-heat); }
 .headCool { fill: var(--_uc-cool); }
-.headGrey { fill: var(--_uc-grey-3); }
+.headGrey { fill: var(--_uc-grey-2); }
 
 /* -------------------------------------------------------- Components */
 .compressorBody {
@@ -293,11 +287,24 @@
 }
 
 /* -------------------------------------------------------- Condensate */
-.drain {
+/* Pumped back to the condenser unit alongside the refrigerant: thin grey, never lit. */
+.condensateGroup { opacity: 0.9; }
+.condensate {
   fill: none;
-  stroke: var(--_uc-grey-3);
+  stroke: var(--_uc-grey-2);
   stroke-width: 2.5;
   stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.pump {
+  fill: var(--_uc-bg);
+  stroke: var(--_uc-grey-1);
+  stroke-width: 2;
+}
+.pumpGlyph {
+  font-size: 19px;
+  font-weight: 700;
+  fill: var(--_uc-grey-1);
 }
 
 /* Label row under the casing: unit name, or the step's component callout */
@@ -404,7 +411,7 @@
 @container (min-width: 480px) {
   .stage {
     flex: 0 1 auto;
-    aspect-ratio: 800 / 516;
+    aspect-ratio: 760 / 516;
   }
   .band {
     flex: 1 1 auto;
